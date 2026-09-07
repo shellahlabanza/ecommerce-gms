@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Merchandise Store · Analytics Dashboard</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <nav class="sidebar">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <div>
+        <div class="brand-title">GA4 Insights</div>
+        <div class="brand-sub">Merchandise Store</div>
+      </div>
+    </div>
+
+    <ul class="nav" id="nav-list">
+      <li><button class="nav-item active" data-panel="overview"><span class="nav-dot"></span>Overview</button></li>
+      <li><button class="nav-item" data-panel="trends"><span class="nav-dot"></span>Summary &amp; Trends</button></li>
+      <li><button class="nav-item" data-panel="device"><span class="nav-dot"></span>Device Category</button></li>
+      <li><button class="nav-item" data-panel="countries"><span class="nav-dot"></span>Countries</button></li>
+      <li><button class="nav-item" data-panel="os-browser"><span class="nav-dot"></span>OS &amp; Browser</button></li>
+      <li><button class="nav-item" data-panel="sources"><span class="nav-dot"></span>Top Traffic Sources</button></li>
+      <li><button class="nav-item" data-panel="events"><span class="nav-dot"></span>Events</button></li>
+      <li><button class="nav-item" data-panel="conversion"><span class="nav-dot"></span>Conversion</button></li>
+      <li><button class="nav-item" data-panel="ecommerce"><span class="nav-dot"></span>eCommerce</button></li>
+    </ul>
+
+    <div class="sidebar-footer" id="sidebar-meta">Loading dataset…</div>
+  </nav>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="page-title">Overview</h1>
+        <p class="subtitle" id="page-subtitle">Key metrics across the selected date range.</p>
+      </div>
+
+      <div class="daterange">
+        <div>
+          <label for="start-date">From</label><br />
+          <input type="date" id="start-date" />
+        </div>
+        <div>
+          <label for="end-date">To</label><br />
+          <input type="date" id="end-date" />
+        </div>
+        <div class="presets" id="presets"></div>
+      </div>
+    </div>
+
+    <div id="panels">
+      <div class="loading" id="loading-msg">Loading event data…</div>
+
+      <!-- OVERVIEW -->
+      <section class="panel" id="panel-overview">
+        <div class="kpi-row" id="ov-kpis"></div>
+        <div class="grid cols-2">
+          <div class="col-stack">
+            <div class="card">
+              <p class="card-title">Daily events</p>
+              <p class="card-sub">Total event volume per day, selected range</p>
+              <p class="card-sub">A line chart tracking total event volume per day across the selected date range. It shows overall traffic momentum and helps spot spikes or drop-offs day to day.</p>
+              <canvas id="ov-trend" height="140"></canvas>
+            </div>
+            <div class="card">
+              <p class="card-title">Top 5 countries</p>
+              <p class="card-sub">By event volume</p>
+              <p class="card-sub">A bar chart ranking the five countries generating the most events. It highlights which markets drive the bulk of site activity.</p>
+              <canvas id="ov-countries" height="140"></canvas>
+
+              <div class="col-stack" style="margin-top:12px;">
+                <div class="card">
+                  <p class="card-title">User &amp; sessions over time</p>
+                  <p class="card-sub">Unique users and sessions per day</p>
+                  <p class="card-sub">A line chart plotting unique users and sessions per day. It separates raw traffic volume from actual distinct-visitor reach over time. Comparing the two lines shows whether growth is coming from more people visiting or the same people visiting more often.</p>
+                  <canvas id="ov-usersessions" height="120"></canvas>
+                </div>
+                <div class="card">
+                  <p class="card-title">Traffic by channel</p>
+                  <p class="card-sub">Acquisition channel breakdown</p>
+                  <p class="card-sub">A horizontal bar chart showing event counts for the top acquisition channels. It reveals which channels (organic, direct, referral, etc.) bring in the most activity. It's a fast way to judge where marketing or SEO efforts are paying off in raw engagement.</p>
+                  <canvas id="ov-traffic-channel" height="120"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-stack">
+            <div class="card">
+              <p class="card-title">Device split</p>
+              <p class="card-sub">Share of events by device category</p>
+              <p class="card-sub">A donut chart showing the proportion of events generated by desktop, mobile, and tablet devices. It helps identify which device types dominate user activity and whether the site is optimized for the most common platforms.</p>
+              <canvas id="ov-device" height="140"></canvas>
+            </div>
+            <div class="card">
+              <p class="card-title">Top channels</p>
+              <p class="card-sub">Acquisition channel group</p>
+              <p class="card-sub">A horizontal bar chart ranking the top acquisition channels by event volume. It provides a quick view of which channels are driving the most engagement and helps prioritize marketing efforts.</p>
+              <canvas id="ov-channels" height="140"></canvas>
+            </div>
+          </div>
+        </div>
+
+        
+      </section>
+
+      <!-- SUMMARY & TRENDS -->
+      <section class="panel" id="panel-trends">
+        <div class="kpi-row" id="tr-kpis"></div>
+        <div class="card" style="margin-bottom:14px; position: relative;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+            <div>
+              <p class="card-title">Events, sessions &amp; purchases over time</p>
+              <p class="card-sub">Daily volume, selected range</p>
+            </div>
+            <div id="tr-multi-tabs" class="chart-tabs" aria-hidden="false">
+              <button class="chart-tab active" data-mode="main">Main</button>
+              <button class="chart-tab" data-mode="pageviews">Pageviews &amp; Revenue</button>
+            </div>
+          </div>
+          <canvas id="tr-multi" height="110"></canvas>
+        </div>
+        <div class="grid cols-2">
+          <div class="card">
+            <span class="stat-tag">Central tendency &amp; dispersion</span>
+            <p class="card-title">Daily event volume</p>
+            <p class="card-sub">Distribution of total events-per-day across the range</p>
+            <p class="card-sub">A stat grid showing central tendency and dispersion (mean, median, std dev, etc.) for events-per-day. It quantifies how consistent or volatile daily traffic has been across the range. A high standard deviation relative to the mean would suggest unpredictable, spiky traffic rather than steady flow.</p>
+            <div class="stat-grid" id="tr-stats"></div>
+          </div>
+          <div class="card">
+            <p class="card-title">Unique daily active users</p>
+            <p class="card-sub">Distinct users seen each day</p>
+            <p class="card-sub">A line chart showing the number of unique users seen each day. It tracks the reach of the site over time, separating raw traffic volume from actual distinct-visitor counts. Comparing this to total events or sessions can reveal whether growth is coming from more people visiting or the same people visiting more often.</p>
+            <canvas id="tr-users" height="140"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- DEVICE CATEGORY -->
+      <section class="panel" id="panel-device">
+        <div class="kpi-row" id="dev-kpis"></div>
+        <div class="grid cols-2">
+          <div class="card">
+            <p class="card-title">Events by device category</p>
+            <p class="card-sub">Share of events by device category</p>
+            <p class="card-sub">A donut chart showing the proportion of events generated by desktop, mobile, and tablet devices. It helps identify which device types dominate user activity and whether the site is optimized for the most common platforms.</p>
+            <canvas id="dev-donut" height="100"></canvas>
+          </div>
+          <div class="card">
+            <p class="card-title">Top mobile brands</p>
+            <p class="card-sub">Includes desktop OS vendors reported by GA4</p>
+            <p class="card-sub">A horizontal bar chart ranking the top mobile brands by event volume. It provides insight into which device manufacturers are driving the most engagement and helps inform product and marketing strategies.</p>
+            <canvas id="dev-brand" height="160"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Device category detail</p>
+          <p class="card-sub">Ranked by event volume — position statistics</p>
+          <p class="card-sub">A data table listing device categories with counts and percentages. It provides the exact numbers behind the donut chart above. It's meant for readers who want precise figures rather than just a visual proportion.</p>
+          <table class="data-table" id="dev-table"></table>
+        </div>
+      </section>
+
+      <!-- COUNTRIES -->
+      <section class="panel" id="panel-countries">
+        <div class="kpi-row" id="ctr-kpis"></div>
+        <div class="grid cols-2">
+          <div class="card">
+            <p class="card-title">Top 10 countries</p>
+            <p class="card-sub">By event volume</p>
+            <p class="card-sub">A bar chart ranking the ten countries generating the most events. It expands on the Overview's top-5 view for a fuller geographic picture.</p>
+            <canvas id="ctr-bar" height="220"></canvas>
+          </div>
+          <div class="card">
+            <p class="card-title">Events by continent</p>
+            <p class="card-sub">Share of events by continent</p>
+            <p class="card-sub">A donut chart aggregating events at the continent level. It shows broad regional distribution of traffic. This zoomed-out view complements the country-level charts by revealing macro geographic patterns.</p>
+            <canvas id="ctr-continent" height="220"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Country detail (top 15)</p>
+          <p class="card-sub">Ranked by event volume — position statistics</p>
+          <p class="card-sub">A data table listing the top 15 countries with counts and percentages. It provides the exact numbers behind the bar chart above. It's meant for readers who want precise figures rather than just a visual ranking.</p>
+          <table class="data-table" id="ctr-table"></table>
+        </div>
+      </section>
+
+      <!-- OS & BROWSER -->
+      <section class="panel" id="panel-os-browser">
+        <div class="grid cols-2">
+          <div class="card">
+            <p class="card-title">Operating system</p>
+            <p class="card-sub">Share of events by operating system</p>
+            <p class="card-sub">A bar chart showing the distribution of events across different operating systems. It helps identify which platforms are most commonly used by visitors and informs development priorities.</p>
+            <canvas id="os-bar" height="200"></canvas>
+            <div style="margin-top:12px;"><table class="data-table" id="os-table"></table></div>
+          </div>
+          <div class="card">
+            <p class="card-title">Browser</p>
+            <p class="card-sub">Share of events by browser</p>
+            <p class="card-sub">A bar chart showing the distribution of events across different web browsers. It helps identify which browsers are most commonly used by visitors and informs compatibility and optimization strategies.</p>
+            <canvas id="br-bar" height="200"></canvas>
+            <div style="margin-top:12px;"><table class="data-table" id="br-table"></table></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TOP TRAFFIC SOURCES -->
+      <section class="panel" id="panel-sources">
+        <div class="grid cols-2">
+          <div class="card">
+            <p class="card-title">Channel group</p>
+            <p class="card-sub">Share of events by channel group</p>
+            <p class="card-sub">A donut chart of events grouped by acquisition channel (Organic Search, Direct, Referral, etc.). It shows the high-level mix of how traffic arrives. This gives a quick summary before drilling into individual sources below.</p>
+            <canvas id="src-channel" height="200"></canvas>
+          </div>
+          <div class="card">
+            <p class="card-title">Top sources</p>
+            <p class="card-sub">Share of events by top traffic sources</p>
+            <p class="card-sub">A horizontal bar chart of individual traffic sources (e.g., google, direct, specific referrers). It drills one level deeper than channel group to name exact sources. This helps identify specific referring sites or platforms worth further investment.</p>
+            <canvas id="src-source" height="200"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <p class="card-title">Source details</p>
+          <p class="card-sub">Ranked by event volume — position statistics</p>
+          <p class="card-sub">A data table combining source and medium pairs with counts. It's the most granular acquisition breakdown available in the dashboard. It's especially useful for marketers who need source/medium combinations to match campaign tracking.</p>
+          <table class="data-table" id="src-table"></table>
+        </div>
+      </section>
+
+      <!-- EVENTS -->
+      <section class="panel" id="panel-events">
+        <div class="card">
+          <p class="card-title">Event frequency</p>
+          <p class="card-sub">All tracked event types, ranked by count</p>
+          <p class="card-sub">A bar chart ranking all tracked GA4 event types (page_view, scroll, add_to_cart, etc.) by count. It shows what users are doing most often on the site. This helps distinguish passive browsing behavior (like scrolling) from active engagement (like adding to cart).</p>
+          <canvas id="ev-bar" height="260"></canvas>
+        </div>
+        <div class="card" style="margin-top:14px;">
+          <p class="card-title">Event details</p>
+          <p class="card-sub">Ranked by event volume — position statistics</p>
+          <p class="card-sub">A data table listing every event type with exact counts and percentages. It backs up the frequency chart with precise figures for reporting. It's the definitive reference for exact event volumes across the whole dataset.</p>
+          <table class="data-table" id="ev-table"></table>
+        </div>
+      </section>
+
+      <!-- CONVERSION -->
+      <section class="panel" id="panel-conversion">
+        <div class="kpi-row" id="cv-kpis"></div>
+        <div class="card">
+          <p class="card-title">Purchase funnel</p>
+          <p class="card-sub">Session start → view item → add to cart → checkout → payment → purchase</p>
+          <p class="card-sub">A visual representation of the customer journey from initial visit to final purchase. It helps identify drop-off points and optimize the conversion process.</p>
+          <div class="funnel" id="cv-funnel"></div>
+        </div>
+          <div class="grid cols-2" style="margin-top:12px;">
+            <div class="card">
+              <p class="card-title">Conversion rate over time</p>
+              <p class="card-sub">Purchases ÷ sessions per day</p>
+              <p class="card-sub">A line chart showing the conversion rate over time. It helps identify trends and patterns in the conversion process.</p>
+              <canvas id="cv-rate" height="120"></canvas>
+            </div>
+            <div class="card">
+              <p class="card-title">Conversion rate by channel</p>
+              <p class="card-sub">Channel, sessions, conversions, and rate</p>
+              <p class="card-sub">A bar chart showing the conversion rate by channel. It helps identify which marketing channels are most effective at driving conversions.</p>
+              <table class="data-table" id="cv-channel-table"></table>
+            </div>
+          </div>
+      </section>
+
+      <!-- ECOMMERCE -->
+      <section class="panel" id="panel-ecommerce">
+        <div class="kpi-row" id="ec-kpis"></div>
+        <div class="grid cols-2">
+          <div class="card">
+            <p class="card-title">Daily purchase revenue</p>
+            <p class="card-sub">Total revenue per day, selected range</p>
+            <p class="card-sub">A line chart showing total purchase revenue per day. It helps track overall sales performance and identify trends or anomalies in revenue generation.</p>
+            <canvas id="ec-trend" height="160"></canvas>
+          </div>
+          <div class="card">
+            <p class="card-title">Revenue by device category</p>
+            <p class="card-sub">Total revenue generated by each device category</p>
+            <p class="card-sub">A bar chart showing revenue by device category. It helps identify which devices are driving the most sales.</p>
+            <canvas id="ec-device" height="160"></canvas>
+          </div>
+        </div>
+        <div class="grid cols-2">
+          <div class="card">
+            <span class="stat-tag">Central tendency &amp; dispersion</span>
+            <p class="card-title">Order value (USD)</p>
+            <p class="card-sub">Distribution of order values across the range</p>
+            <p class="card-sub">A stat grid showing central tendency and dispersion (mean, median, std dev, etc.) for order values. It quantifies how consistent or variable purchase amounts have been across the range. A high standard deviation relative to the mean would suggest a wide range of order sizes rather than uniform pricing.</p>
+            <div class="stat-grid" id="ec-stats-rev"></div>
+          </div>
+          <div class="card">
+            <span class="stat-tag">Position</span>
+            <p class="card-title">Order value percentiles</p>
+            <p class="card-sub">Percentile breakdown of order values</p>
+            <p class="card-sub">A stat grid showing order value percentiles (10th, 25th, 50th, 75th, 90th). It provides a more granular view of the distribution of order values, helping to understand the range and concentration of purchase amounts. This complements the central tendency stats by showing how order values are spread across the customer base.</p>
+            <div class="stat-grid" id="ec-stats-pos"></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
