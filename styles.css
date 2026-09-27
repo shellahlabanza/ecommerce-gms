@@ -483,3 +483,12 @@ table.data-table td.num .progress-cell {
   .app { grid-template-columns: 1fr; }
   .sidebar { position: relative; height: auto; }
 }
+
+.insight {
+  font-size: 12.5px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--chart-3);
+  background: var(--muted);
+  border-radius: 4px;
+}

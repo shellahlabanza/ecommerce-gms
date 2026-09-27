@@ -25,6 +25,7 @@ function readPalette() {
   PALETTE.primary = get('--primary');
   PALETTE.muted = get('--muted-foreground');
   PALETTE.border = get('--border');
+  PALETTE.fg = get('--foreground');
   PALETTE.series = [PALETTE.chart1, PALETTE.chart3, PALETTE.chart4, PALETTE.chart2, PALETTE.chart5];
 }
 
@@ -134,7 +135,7 @@ function quantile(sortedArr, q) {
 function describe(values) {
   const v = values.filter((x) => x !== null && x !== undefined && !Number.isNaN(x));
   if (v.length === 0) {
-    return { n: 0, mean: null, median: null, mode: null, min: null, max: null, range: null, std: null, variance: null, iqr: null, p25: null, p75: null, p90: null };
+    return { n: 0, mean: null, median: null, mode: null, min: null, max: null, range: null, std: null, variance: null, iqr: null, p10: null, p25: null, p75: null, p90: null, skew: null };
   }
   const sorted = [...v].sort((a, b) => a - b);
   const n = v.length;
@@ -146,10 +147,14 @@ function describe(values) {
   let mode = v[0], modeCount = 0;
   for (const [val, c] of freq.entries()) if (c > modeCount) { mode = val; modeCount = c; }
   const p25 = quantile(sorted, 0.25), p75 = quantile(sorted, 0.75);
+  // adjusted Fisher-Pearson sample skewness (same formula as pandas / Excel SKEW)
+  const skew = n > 2 && std > 0
+    ? (n / ((n - 1) * (n - 2))) * v.reduce((a, x) => a + ((x - mean) / std) ** 3, 0)
+    : null;
   return {
     n, mean, median: quantile(sorted, 0.5), mode,
     min: sorted[0], max: sorted[n - 1], range: sorted[n - 1] - sorted[0],
-    std, variance, iqr: p75 - p25, p25, p75, p90: quantile(sorted, 0.9),
+    std, variance, iqr: p75 - p25, p10: quantile(sorted, 0.1), p25, p75, p90: quantile(sorted, 0.9), skew,
   };
 }
 
@@ -180,35 +185,191 @@ function makeLine(id, labels, datasets, opts = {}) {
   });
 }
 
+// Draws a text label on every bar of the first dataset so values are readable
+// without hovering. `textFor(i)` returns a string, or an array of lines for vertical bars.
+function barLabelPlugin(textFor, horizontal) {
+  return {
+    id: 'barLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = `600 11.5px ${Chart.defaults.font.family}`;
+      ctx.fillStyle = PALETTE.fg;
+      chart.getDatasetMeta(0).data.forEach((bar, i) => {
+        const lines = [].concat(textFor(i));
+        if (horizontal) {
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(lines.join(' · '), bar.x + 6, bar.y);
+        } else {
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          // stack lines upward from just above the bar top
+          lines.slice().reverse().forEach((line, j) => ctx.fillText(line, bar.x, bar.y - 4 - j * 14));
+        }
+      });
+      ctx.restore();
+    },
+  };
+}
+
+// Bar chart with a direct label on every bar. With `opts.total`, each label shows the
+// bar's share of that total plus its value ("41.3% · 41,325"); `opts.fmt` formats the value.
 function makeBar(id, labels, data, opts = {}) {
   killChart(id);
-  const ctx = document.getElementById(id).getContext('2d');
   const horizontal = opts.horizontal;
+  const fmt = opts.fmt || fmtInt;
+  const total = opts.total;
+  const textFor = (i) => (total ? [fmtPct(data[i] / total), fmt(data[i])] : fmt(data[i]));
+  const ctx = document.getElementById(id).getContext('2d');
   state.charts[id] = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
-      datasets: [{ data, backgroundColor: opts.color || PALETTE.chart1, borderRadius: 4, maxBarThickness: 34 }],
+      datasets: [{ data, backgroundColor: opts.color || PALETTE.chart1, borderRadius: 4, maxBarThickness: horizontal ? 28 : 34 }],
     },
     options: {
       indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: !horizontal, color: PALETTE.border }, beginAtZero: true },
-        y: { grid: { display: horizontal, color: PALETTE.border }, beginAtZero: true },
+      // room for the labels past the end of the longest bar
+      layout: { padding: horizontal ? { right: total ? 110 : 60 } : { top: total ? 32 : 18 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => (total ? `${fmt(c.raw)} (${fmtPct(c.raw / total)})` : fmt(c.raw)) } },
       },
+      // the labels carry the values, so the value axis is hidden
+      scales: horizontal
+        ? { x: { display: false, beginAtZero: true }, y: { grid: { display: false }, border: { display: false } } }
+        : { x: { grid: { display: false } }, y: { display: false, beginAtZero: true } },
     },
+    plugins: [barLabelPlugin(textFor, horizontal)],
   });
+}
+
+// Labels drawn outside each slice with a leader line: category name, then "share · count".
+// Labels on the same side are pushed apart vertically so thin neighbouring slices don't collide.
+function donutLabelPlugin(labels, data, total) {
+  const LINE_GAP = 30; // min vertical distance between two labels on the same side
+  return {
+    id: 'donutLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx, chartArea } = chart;
+      const placed = chart.getDatasetMeta(0).data.map((arc, i) => {
+        const { x, y, startAngle, endAngle, outerRadius } = arc.getProps(['x', 'y', 'startAngle', 'endAngle', 'outerRadius'], true);
+        const mid = (startAngle + endAngle) / 2;
+        const cos = Math.cos(mid), sin = Math.sin(mid);
+        const right = cos >= 0;
+        return {
+          i, right,
+          anchor: [x + cos * outerRadius, y + sin * outerRadius],
+          elbow: [x + cos * (outerRadius + 14), y + sin * (outerRadius + 14)],
+          textY: y + sin * (outerRadius + 14),
+          textX: x + (right ? 1 : -1) * (outerRadius + 28),
+        };
+      });
+      [true, false].forEach((side) => {
+        const group = placed.filter((pl) => pl.right === side).sort((a, b) => a.textY - b.textY);
+        for (let k = 1; k < group.length; k++) {
+          group[k].textY = Math.max(group[k].textY, group[k - 1].textY + LINE_GAP);
+        }
+        // keep the lowest label inside the chart, shifting the stack up if needed
+        const overflow = group.length ? group[group.length - 1].textY - (chartArea.bottom - 8) : 0;
+        if (overflow > 0) group.forEach((pl) => { pl.textY -= overflow; });
+      });
+
+      ctx.save();
+      placed.forEach((pl) => {
+        if (!data[pl.i]) return;
+        const color = PALETTE.series[pl.i % PALETTE.series.length];
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(...pl.anchor);
+        ctx.lineTo(pl.elbow[0], pl.textY);
+        ctx.lineTo(pl.textX + (pl.right ? -4 : 4), pl.textY);
+        ctx.stroke();
+
+        ctx.textAlign = pl.right ? 'left' : 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = PALETTE.fg;
+        ctx.font = `600 12px ${Chart.defaults.font.family}`;
+        ctx.fillText(labels[pl.i], pl.textX, pl.textY - 7);
+        ctx.fillStyle = PALETTE.muted;
+        ctx.font = `11.5px ${Chart.defaults.font.family}`;
+        ctx.fillText(`${fmtPct(data[pl.i] / total)} · ${fmtInt(data[pl.i])}`, pl.textX, pl.textY + 8);
+      });
+      ctx.restore();
+    },
+  };
 }
 
 function makeDonut(id, labels, data) {
   killChart(id);
+  const total = data.reduce((a, b) => a + b, 0) || 1;
   const ctx = document.getElementById(id).getContext('2d');
   state.charts[id] = new Chart(ctx, {
     type: 'doughnut',
     data: { labels, datasets: [{ data, backgroundColor: PALETTE.series, borderWidth: 2, borderColor: '#fff' }] },
-    options: { responsive: true, cutout: '62%', plugins: { legend: { position: 'bottom' } } },
+    // doughnuts default to a 1:1 box, which makes them much taller than the charts beside them
+    options: {
+      responsive: true, aspectRatio: 1.6, cutout: '62%',
+      // room around the ring for the outside labels
+      layout: { padding: { top: 28, bottom: 28, left: 120, right: 120 } },
+      // every slice is labelled directly, so the legend would only repeat the names
+      plugins: { legend: { display: false } },
+    },
+    plugins: [donutLabelPlugin(labels, data, total)],
+  });
+}
+
+// Histogram with fixed-width bins; values >= cap fall into a final open-ended bin.
+// `markers` ([{ label, value, color }]) are drawn as dashed vertical lines.
+function makeHistogram(id, values, binWidth, cap, markers) {
+  killChart(id);
+  const nBins = Math.ceil(cap / binWidth) + 1;
+  const counts = new Array(nBins).fill(0);
+  for (const v of values) counts[Math.min(Math.floor(v / binWidth), nBins - 1)]++;
+  const labels = counts.map((_, i) => (i === nBins - 1 ? `$${cap}+` : `$${i * binWidth}–${(i + 1) * binWidth}`));
+
+  const markerPlugin = {
+    id: 'histMarkers',
+    afterDatasetsDraw(chart) {
+      const { ctx, chartArea: { left, right, top, bottom } } = chart;
+      const px = (v) => left + (Math.min(v, cap + binWidth) / (nBins * binWidth)) * (right - left);
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.font = `600 11px ${Chart.defaults.font.family}`;
+      ctx.textAlign = 'left';
+      markers.forEach((m, i) => {
+        const x = px(m.value);
+        const text = `${m.label} ${fmtUsd(m.value)}`;
+        const y = top + 12 + i * 16;
+        ctx.strokeStyle = m.color;
+        ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+        // label on a light chip so it stays readable where it crosses a bar
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(x + 2, y - 10, ctx.measureText(text).width + 6, 14);
+        ctx.fillStyle = m.color;
+        ctx.fillText(text, x + 5, y);
+      });
+      ctx.restore();
+    },
+  };
+
+  const ctx = document.getElementById(id).getContext('2d');
+  state.charts[id] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Orders', data: counts, backgroundColor: PALETTE.chart2, categoryPercentage: 1, barPercentage: 0.94 }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, title: { display: true, text: 'Order value (USD)' } },
+        y: { grid: { color: PALETTE.border }, beginAtZero: true, grace: '20%', ticks: { precision: 0 }, title: { display: true, text: 'Orders' } },
+      },
+    },
+    plugins: [markerPlugin, barLabelPlugin((i) => (counts[i] ? fmtInt(counts[i]) : ''), false)],
   });
 }
 
@@ -305,25 +466,10 @@ function renderOverview(rows) {
   makeDonut('ov-device', device.map((d) => d.label), device.map((d) => d.count));
 
   const countries = topN(countBy(rows, 'country'), 5);
-  makeBar('ov-countries', countries.map((c) => c.label), countries.map((c) => c.count), { horizontal: true, color: PALETTE.chart2 });
+  makeBar('ov-countries', countries.map((c) => c.label), countries.map((c) => c.count), { horizontal: true, total: rows.length, color: PALETTE.chart2 });
 
   const channels = countBy(rows, 'channel_group');
-  makeDonut('ov-channels', channels.map((c) => c.label), channels.map((c) => c.count));
-
-  // Overview: User & sessions over time
-  const usersSeries = dailyUniqueUsers(rows);
-  const enIdx = state.colIdx.event_name;
-  const sessionCode = state.data.lookups.event_name.indexOf('session_start');
-  const sessionsByDay = new Map();
-  for (const r of rows) if (r[enIdx] === sessionCode) sessionsByDay.set(r[state.colIdx.day], (sessionsByDay.get(r[state.colIdx.day]) || 0) + 1);
-  makeLine('ov-usersessions', usersSeries.map((d) => dateLabel(d.day)), [
-    { label: 'Users', data: usersSeries.map((d) => d.count), borderColor: PALETTE.chart2, backgroundColor: PALETTE.chart2, tension: 0.3, pointRadius: 0, borderWidth: 2 },
-    { label: 'Sessions', data: usersSeries.map((d) => sessionsByDay.get(d.day) || 0), borderColor: PALETTE.chart3, backgroundColor: PALETTE.chart3, tension: 0.3, pointRadius: 0, borderWidth: 2 },
-  ]);
-
-  // Overview: Traffic by channel (top channels horizontal bar)
-  const topChannels = topN(channels, 8);
-  makeBar('ov-traffic-channel', topChannels.map((c) => c.label), topChannels.map((c) => c.count), { horizontal: true, color: PALETTE.chart1 });
+  makeBar('ov-channels', channels.map((c) => c.label), channels.map((c) => c.count), { horizontal: true, total: rows.length, color: PALETTE.chart1 });
 }
 
 function renderTrends(rows) {
@@ -453,7 +599,7 @@ function renderDevice(rows) {
   makeDonut('dev-donut', device.map((d) => d.label), device.map((d) => d.count));
 
   const brands = topN(countBy(rows, 'mobile_brand_name'), 8);
-  makeBar('dev-brand', brands.map((b) => b.label), brands.map((b) => b.count), { color: PALETTE.chart3 });
+  makeBar('dev-brand', brands.map((b) => b.label), brands.map((b) => b.count), { horizontal: true, total, color: PALETTE.chart3 });
 
   // compute revenue, unique users, and purchases per device
   const devIdx = state.colIdx.device_category;
@@ -501,10 +647,10 @@ function renderCountries(rows) {
   const countries = countBy(rows, 'country');
   const total = rows.length;
   const top10 = topN(countries, 10);
-  makeBar('ctr-bar', top10.map((c) => c.label), top10.map((c) => c.count), { horizontal: true, color: PALETTE.chart1 });
+  makeBar('ctr-bar', top10.map((c) => c.label), top10.map((c) => c.count), { horizontal: true, total, color: PALETTE.chart1 });
 
   const continents = countBy(rows, 'continent');
-  makeDonut('ctr-continent', continents.map((c) => c.label), continents.map((c) => c.count));
+  makeBar('ctr-continent', continents.map((c) => c.label), continents.map((c) => c.count), { horizontal: true, total, color: PALETTE.chart3 });
 
   const top15 = topN(countries, 15);
 
@@ -579,8 +725,8 @@ function renderOsBrowser(rows) {
   // helper to get display label (use '(other)' for empty/null/whitespace)
   const displayLabel = (s) => (s && String(s).trim() ? s : '(other)');
 
-  makeBar('os-bar', os.map((o) => displayLabel(o.label)), os.map((o) => o.count), { color: PALETTE.chart1 });
-  makeBar('br-bar', browser.map((b) => displayLabel(b.label)), browser.map((b) => b.count), { color: PALETTE.chart2 });
+  makeBar('os-bar', os.map((o) => displayLabel(o.label)), os.map((o) => o.count), { total: rows.length, color: PALETTE.chart1 });
+  makeBar('br-bar', browser.map((b) => displayLabel(b.label)), browser.map((b) => b.count), { total: rows.length, color: PALETTE.chart2 });
 
   // compute unique users per OS and per Browser using original keys (may be empty string)
   const osIdx = state.colIdx.operating_system;
@@ -626,10 +772,10 @@ function renderOsBrowser(rows) {
 
 function renderSources(rows) {
   const channels = countBy(rows, 'channel_group');
-  makeDonut('src-channel', channels.map((c) => c.label), channels.map((c) => c.count));
+  makeBar('src-channel', channels.map((c) => c.label), channels.map((c) => c.count), { horizontal: true, total: rows.length, color: PALETTE.chart2 });
 
   const sources = topN(countBy(rows, 'source'), 8);
-  makeBar('src-source', sources.map((s) => s.label), sources.map((s) => s.count), { horizontal: true, color: PALETTE.chart3 });
+  makeBar('src-source', sources.map((s) => s.label), sources.map((s) => s.count), { horizontal: true, total: rows.length, color: PALETTE.chart3 });
 
   // build detailed source/medium table with Source, Medium, Source Name, Channel, Events, Users
   const sIdx = state.colIdx.source, mIdx = state.colIdx.medium, snIdx = state.colIdx.source_name, chIdx = state.colIdx.channel_group;
@@ -671,26 +817,24 @@ function renderSources(rows) {
 function renderEvents(rows) {
   const events = countBy(rows, 'event_name');
   const total = rows.length;
-  makeBar('ev-bar', events.map((e) => e.label), events.map((e) => e.count), { horizontal: true, color: PALETTE.chart1 });
+  makeBar('ev-bar', events.map((e) => e.label), events.map((e) => e.count), { horizontal: true, total, color: PALETTE.chart1 });
 
-  // Sessions progress column: visual progress of event count relative to max
+  // progress column: each event's count relative to the most frequent event
   const maxCount = events.length ? events[0].count : 1;
-  // debug log first few progress values
-  if (window && window.console) console.log('renderEvents: sample', events.slice(0,6).map(e => ({label: e.label, count: e.count, pct: Math.round((e.count/(events[0]?.count||1))*100)})));
   renderTable(document.getElementById('ev-table'),
     [
       { label: '#', num: true },
       { label: 'Event' },
       { label: 'Count', num: true },
       { label: 'Share', num: true },
-      { label: 'Sessions', num: true },
+      { label: 'vs top event', num: true },
     ],
     events.map((e, i) => [
       i + 1,
       e.label,
       fmtInt(e.count),
       fmtPct(e.count / total),
-      { bar: { value: e.count, max: maxCount, display: fmtInt(e.count) } },
+      { bar: { value: e.count, max: maxCount, display: fmtPct(e.count / maxCount) } },
     ]));
 }
 
@@ -767,7 +911,7 @@ function renderConversion(rows) {
   channelArr.sort((a, b) => b.sessions - a.sessions);
   // place Sessions column on the right side for easier comparison of converted/rate
   renderTable(document.getElementById('cv-channel-table'),
-    [ { label: 'Channel' }, { label: 'Converted', num: true }, { label: 'Rate', num: true }, { label: 'Sessions', num: true } ],
+    [ { label: 'Channel' }, { label: 'Purchases', num: true }, { label: 'Rate', num: true }, { label: 'Sessions', num: true } ],
     channelArr.map((c) => [ c.channel, fmtInt(c.converted), fmtPct(c.sessions ? c.converted / c.sessions : 0), fmtInt(c.sessions) ])
   );
 }
@@ -803,9 +947,10 @@ function renderEcommerce(rows) {
   const dayVals = days.map((d) => d.rev);
   const dayStats = describe(dayVals);
   makeLine('ec-trend', days.map((d) => dateLabel(d.day)), [{
-    data: dayVals, borderColor: PALETTE.chart4, backgroundColor: PALETTE.chart4, tension: 0.3, pointRadius: 0, borderWidth: 2,
+    label: 'Revenue', data: dayVals, borderColor: PALETTE.chart4, backgroundColor: PALETTE.chart4, tension: 0.3, pointRadius: 0, borderWidth: 2,
   }], {
     plugins: {
+      legend: { display: false },
       tooltip: {
         callbacks: {
           afterBody: function() {
@@ -827,8 +972,14 @@ function renderEcommerce(rows) {
     const label = lookup('device_category', r[devIdx]);
     revByDevice.set(label, (revByDevice.get(label) || 0) + r[revIdx]);
   }
-  const deviceEntries = [...revByDevice.entries()];
-  makeDonut('ec-device', deviceEntries.map((e) => e[0]), deviceEntries.map((e) => e[1]));
+  const deviceEntries = [...revByDevice.entries()].sort((a, b) => b[1] - a[1]);
+  makeBar('ec-device', deviceEntries.map((e) => e[0]), deviceEntries.map((e) => e[1]), { total: totalRevenue, fmt: fmtUsd, color: PALETTE.chart4 });
+
+  makeHistogram('ec-hist', revenues, 25, 250, stats.n ? [
+    { label: 'Median', value: stats.median, color: PALETTE.chart1 },
+    { label: 'Mean', value: stats.mean, color: PALETTE.chart4 },
+  ] : []);
+  document.getElementById('ec-skew').textContent = skewNote(stats);
 
   statGrid(document.getElementById('ec-stats-rev'), [
     ['Mean', stats.mean ? fmtUsd(stats.mean) : '—'],
@@ -843,12 +994,29 @@ function renderEcommerce(rows) {
 
   statGrid(document.getElementById('ec-stats-pos'), [
     ['Min', stats.min !== null ? fmtUsd(stats.min) : '—'],
+    ['P10', stats.p10 != null ? fmtUsd(stats.p10) : '—'],
     ['P25', stats.p25 ? fmtUsd(stats.p25) : '—'],
     ['P50 (median)', stats.median ? fmtUsd(stats.median) : '—'],
     ['P75', stats.p75 ? fmtUsd(stats.p75) : '—'],
     ['P90', stats.p90 ? fmtUsd(stats.p90) : '—'],
     ['Max', stats.max !== null ? fmtUsd(stats.max) : '—'],
   ]);
+}
+
+// Plain-language reading of a distribution's shape, for the order-value histogram
+function skewNote(stats) {
+  if (stats.n < 3 || stats.skew == null) return 'Not enough orders in this range to describe the distribution.';
+  const gap = stats.median ? (stats.mean - stats.median) / stats.median : 0;
+  const skewTxt = `Skewness ${stats.skew.toFixed(2)} (n = ${fmtInt(stats.n)} orders).`;
+  if (stats.skew > 0.5) {
+    return `${skewTxt} Right-skewed: most orders are small, with a long tail of large ones. `
+      + `The mean (${fmtUsd(stats.mean)}) is ${fmtPct(gap)} above the median (${fmtUsd(stats.median)}) because a few big orders pull it up, `
+      + `so the median is the better measure of a typical order.`;
+  }
+  if (stats.skew < -0.5) {
+    return `${skewTxt} Left-skewed: a few unusually small orders pull the mean (${fmtUsd(stats.mean)}) below the median (${fmtUsd(stats.median)}).`;
+  }
+  return `${skewTxt} Roughly symmetric: the mean (${fmtUsd(stats.mean)}) and median (${fmtUsd(stats.median)}) are close, so either describes a typical order.`;
 }
 
 const RENDERERS = {
