@@ -1,0 +1,1461 @@
+{
+ "p1": {
+  "n_visitors": 42610,
+  "n_buyers": 127,
+  "best_C": 0.01,
+  "gb_trees": 112,
+  "metrics": [
+   {
+    "model": "Baseline (no buyer)",
+    "accuracy": 0.9971,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "auc": 0.5
+   },
+   {
+    "model": "Logistic regression",
+    "accuracy": 0.9037,
+    "precision": 0.0251,
+    "recall": 0.84,
+    "f1": 0.0487,
+    "auc": 0.8991
+   },
+   {
+    "model": "Gradient boosting",
+    "accuracy": 0.8803,
+    "precision": 0.0203,
+    "recall": 0.84,
+    "f1": 0.0395,
+    "auc": 0.8935
+   }
+  ],
+  "overfit": [
+   {
+    "model": "Logistic regression",
+    "train_auc": 0.9047,
+    "test_auc": 0.8991,
+    "gap": 0.0057
+   },
+   {
+    "model": "Gradient boosting",
+    "train_auc": 0.9205,
+    "test_auc": 0.8935,
+    "gap": 0.027
+   }
+  ],
+  "odds_ratios": [
+   {
+    "feature": "country_Spain",
+    "coefficient": 0.9895,
+    "odds_ratio": 2.69
+   },
+   {
+    "feature": "channel_group_Other",
+    "coefficient": -0.676,
+    "odds_ratio": 0.5086
+   },
+   {
+    "feature": "n_scroll",
+    "coefficient": 0.6644,
+    "odds_ratio": 1.9433
+   },
+   {
+    "feature": "country_China",
+    "coefficient": -0.6141,
+    "odds_ratio": 0.5411
+   },
+   {
+    "feature": "device_category_tablet",
+    "coefficient": -0.608,
+    "odds_ratio": 0.5444
+   },
+   {
+    "feature": "n_page_view",
+    "coefficient": 0.579,
+    "odds_ratio": 1.7842
+   },
+   {
+    "feature": "channel_group_Redacted (Privacy)",
+    "coefficient": 0.5712,
+    "odds_ratio": 1.7704
+   },
+   {
+    "feature": "n_view_item",
+    "coefficient": 0.4914,
+    "odds_ratio": 1.6346
+   },
+   {
+    "feature": "country_Hong Kong",
+    "coefficient": 0.4715,
+    "odds_ratio": 1.6024
+   },
+   {
+    "feature": "channel_group_Paid",
+    "coefficient": 0.4537,
+    "odds_ratio": 1.5741
+   }
+  ],
+  "gb_importance": [
+   {
+    "feature": "n_page_view",
+    "importance": 0.5978
+   },
+   {
+    "feature": "n_view_item",
+    "importance": 0.1431
+   },
+   {
+    "feature": "n_scroll",
+    "importance": 0.1154
+   },
+   {
+    "feature": "country_Spain",
+    "importance": 0.0433
+   },
+   {
+    "feature": "channel_group_Redacted (Privacy)",
+    "importance": 0.016
+   },
+   {
+    "feature": "channel_group_Other",
+    "importance": 0.0145
+   },
+   {
+    "feature": "channel_group_Organic Search",
+    "importance": 0.0125
+   },
+   {
+    "feature": "n_session_start",
+    "importance": 0.0105
+   },
+   {
+    "feature": "channel_group_Referral",
+    "importance": 0.0073
+   },
+   {
+    "feature": "country_Singapore",
+    "importance": 0.0067
+   }
+  ],
+  "top_visitors": [
+   {
+    "visitor": "4976040.551175241",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "5645225.691765346",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "27314189.035681482",
+    "probability": 1.0,
+    "actual_buyer": 1
+   },
+   {
+    "visitor": "82102048.19754665",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "5118314977.732988",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "34613058.08726859",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "1055924025.4008704",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "3169394.6618522457",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "39965653.03186004",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "60425733.9344537",
+    "probability": 1.0,
+    "actual_buyer": 1
+   },
+   {
+    "visitor": "67242982.04323433",
+    "probability": 1.0,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "7688722.67068298",
+    "probability": 0.9999,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "17252253.520163886",
+    "probability": 0.9999,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "24561891.82147642",
+    "probability": 0.9999,
+    "actual_buyer": 1
+   },
+   {
+    "visitor": "47064948.10112709",
+    "probability": 0.9998,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "2211286.417233724",
+    "probability": 0.9998,
+    "actual_buyer": 1
+   },
+   {
+    "visitor": "2049470.1567030647",
+    "probability": 0.9998,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "2167403.79064562",
+    "probability": 0.9998,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "40103327.36498978",
+    "probability": 0.9998,
+    "actual_buyer": 0
+   },
+   {
+    "visitor": "36846464.86451565",
+    "probability": 0.9997,
+    "actual_buyer": 0
+   }
+  ],
+  "share_buyers_top1pct": 0.32
+ },
+ "p2": {
+  "orders": {
+   "n_train": 98,
+   "n_test": 25,
+   "baseline_value": 51.0,
+   "ridge_alpha": 303.9195,
+   "metrics": [
+    {
+     "model": "Baseline (training median)",
+     "MAE": 33.44,
+     "RMSE": 51.4051,
+     "R2": -0.0521
+    },
+    {
+     "model": "Ridge regression",
+     "MAE": 33.0485,
+     "RMSE": 51.3608,
+     "R2": -0.0503
+    }
+   ],
+   "cv": [
+    {
+     "fold": 1,
+     "baseline_MAE": 68.9,
+     "ridge_MAE": 70.0379
+    },
+    {
+     "fold": 2,
+     "baseline_MAE": 36.45,
+     "ridge_MAE": 36.3523
+    },
+    {
+     "fold": 3,
+     "baseline_MAE": 42.9,
+     "ridge_MAE": 42.9219
+    },
+    {
+     "fold": 4,
+     "baseline_MAE": 29.8421,
+     "ridge_MAE": 29.0845
+    },
+    {
+     "fold": 5,
+     "baseline_MAE": 54.8947,
+     "ridge_MAE": 54.2582
+    }
+   ],
+   "effects": [
+    {
+     "feature": "country_United States",
+     "coefficient": 0.0213,
+     "pct_change_in_order_value": 2.1577
+    },
+    {
+     "feature": "channel_group_Paid",
+     "coefficient": -0.016,
+     "pct_change_in_order_value": -1.5896
+    },
+    {
+     "feature": "channel_group_Referral",
+     "coefficient": 0.0154,
+     "pct_change_in_order_value": 1.5513
+    },
+    {
+     "feature": "country_United Kingdom",
+     "coefficient": -0.0142,
+     "pct_change_in_order_value": -1.4137
+    },
+    {
+     "feature": "month_Nov",
+     "coefficient": -0.013,
+     "pct_change_in_order_value": -1.2923
+    },
+    {
+     "feature": "channel_group_Other",
+     "coefficient": -0.0125,
+     "pct_change_in_order_value": -1.2458
+    },
+    {
+     "feature": "channel_group_Redacted (Privacy)",
+     "coefficient": 0.0079,
+     "pct_change_in_order_value": 0.7967
+    },
+    {
+     "feature": "country_Spain",
+     "coefficient": -0.007,
+     "pct_change_in_order_value": -0.6945
+    },
+    {
+     "feature": "country_Other",
+     "coefficient": -0.0065,
+     "pct_change_in_order_value": -0.6482
+    },
+    {
+     "feature": "channel_group_Organic Search",
+     "coefficient": -0.0052,
+     "pct_change_in_order_value": -0.521
+    }
+   ],
+   "overfit": [
+    {
+     "model": "Ridge regression",
+     "train_RMSE": 83.0955,
+     "test_RMSE": 51.3608,
+     "gap": -31.7346
+    }
+   ]
+  },
+  "traffic": {
+   "metrics": [
+    {
+     "model": "Baseline (seasonal naive)",
+     "MAE": 119.0,
+     "RMSE": 163.4009
+    },
+    {
+     "model": "Holt-Winters",
+     "MAE": 117.4258,
+     "RMSE": 161.2414
+    }
+   ],
+   "weekday_effects": [
+    {
+     "weekday": "Monday",
+     "effect_vs_average_day": 57.6444
+    },
+    {
+     "weekday": "Tuesday",
+     "effect_vs_average_day": 261.4944
+    },
+    {
+     "weekday": "Wednesday",
+     "effect_vs_average_day": 162.9915
+    },
+    {
+     "weekday": "Thursday",
+     "effect_vs_average_day": 60.5665
+    },
+    {
+     "weekday": "Friday",
+     "effect_vs_average_day": 24.6336
+    },
+    {
+     "weekday": "Saturday",
+     "effect_vs_average_day": -236.4188
+    },
+    {
+     "weekday": "Sunday",
+     "effect_vs_average_day": -330.9116
+    }
+   ],
+   "params": {
+    "smoothing_level": 0.8443,
+    "smoothing_trend": 0.0001,
+    "smoothing_seasonal": 0.0,
+    "damping_trend": 0.9275
+   },
+   "overfit": [
+    {
+     "model": "Baseline (seasonal naive)",
+     "train_MAE": 219.0704,
+     "test_MAE": 119.0,
+     "gap": -100.0704
+    },
+    {
+     "model": "Holt-Winters",
+     "train_MAE": 109.5519,
+     "test_MAE": 117.4258,
+     "gap": 7.874
+    }
+   ]
+  }
+ },
+ "p3": {
+  "orders": {
+   "baseline_range": [
+    17.4,
+    147.6
+   ],
+   "metrics": [
+    {
+     "model": "Baseline (fixed range)",
+     "MAE_P50": 33.44,
+     "coverage": 0.8,
+     "avg_width": 130.2
+    },
+    {
+     "model": "Quantile regression",
+     "MAE_P50": 34.5275,
+     "coverage": 0.76,
+     "avg_width": 109.5823
+    }
+   ],
+   "width_effects": [
+    {
+     "feature": "channel_group_Other",
+     "coef_P10": -0.5596,
+     "coef_P50": 0.0,
+     "coef_P90": 0.0,
+     "widens_range_by": 0.5596
+    },
+    {
+     "feature": "channel_group_Paid",
+     "coef_P10": -0.4796,
+     "coef_P50": -1.0765,
+     "coef_P90": 0.0,
+     "widens_range_by": 0.4796
+    },
+    {
+     "feature": "day_of_week_Tuesday",
+     "coef_P10": 0.0,
+     "coef_P50": 0.0,
+     "coef_P90": 0.3279,
+     "widens_range_by": 0.3279
+    },
+    {
+     "feature": "channel_group_Organic Search",
+     "coef_P10": -0.2719,
+     "coef_P50": -0.0588,
+     "coef_P90": 0.0,
+     "widens_range_by": 0.2719
+    },
+    {
+     "feature": "channel_group_Referral",
+     "coef_P10": 0.0334,
+     "coef_P50": 0.348,
+     "coef_P90": 0.276,
+     "widens_range_by": 0.2425
+    },
+    {
+     "feature": "day_of_week_Wednesday",
+     "coef_P10": 0.0,
+     "coef_P50": 0.0,
+     "coef_P90": 0.2013,
+     "widens_range_by": 0.2013
+    },
+    {
+     "feature": "month_Jan",
+     "coef_P10": 0.0,
+     "coef_P50": 0.1139,
+     "coef_P90": -0.1838,
+     "widens_range_by": -0.1838
+    },
+    {
+     "feature": "country_United Kingdom",
+     "coef_P10": -0.1335,
+     "coef_P50": -1.117,
+     "coef_P90": 0.0,
+     "widens_range_by": 0.1335
+    },
+    {
+     "feature": "channel_group_Redacted (Privacy)",
+     "coef_P10": 0.1335,
+     "coef_P50": 0.0,
+     "coef_P90": 0.0,
+     "widens_range_by": -0.1335
+    },
+    {
+     "feature": "month_Nov",
+     "coef_P10": 0.0,
+     "coef_P50": -0.288,
+     "coef_P90": -0.1062,
+     "widens_range_by": -0.1062
+    }
+   ],
+   "overfit": [
+    {
+     "model": "Quantile regression",
+     "train_coverage": 0.898,
+     "test_coverage": 0.76,
+     "gap": 0.138
+    }
+   ],
+   "test_ranges": [
+    {
+     "actual": 139.0,
+     "P10": 21.7143,
+     "P50": 84.0277,
+     "P90": 155.2024
+    },
+    {
+     "actual": 46.0,
+     "P10": 13.0,
+     "P50": 15.2778,
+     "P90": 116.0
+    },
+    {
+     "actual": 61.0,
+     "P10": 21.0,
+     "P50": 67.7455,
+     "P90": 98.0
+    },
+    {
+     "actual": 40.0,
+     "P10": 13.0,
+     "P50": 25.1769,
+     "P90": 107.3437
+    },
+    {
+     "actual": 14.0,
+     "P10": 24.0,
+     "P50": 47.1175,
+     "P90": 105.9028
+    },
+    {
+     "actual": 11.0,
+     "P10": 16.0,
+     "P50": 59.7116,
+     "P90": 129.0
+    },
+    {
+     "actual": 55.0,
+     "P10": 24.0,
+     "P50": 57.2539,
+     "P90": 116.0
+    },
+    {
+     "actual": 74.0,
+     "P10": 21.7143,
+     "P50": 77.891,
+     "P90": 212.191
+    },
+    {
+     "actual": 49.0,
+     "P10": 24.0,
+     "P50": 77.6121,
+     "P90": 107.3437
+    },
+    {
+     "actual": 26.0,
+     "P10": 21.0,
+     "P50": 59.3332,
+     "P90": 117.7713
+    },
+    {
+     "actual": 74.0,
+     "P10": 21.7143,
+     "P50": 116.4181,
+     "P90": 141.4607
+    },
+    {
+     "actual": 239.0,
+     "P10": 16.0,
+     "P50": 50.9664,
+     "P90": 116.0
+    },
+    {
+     "actual": 29.0,
+     "P10": 21.0,
+     "P50": 40.6772,
+     "P90": 105.9028
+    },
+    {
+     "actual": 14.0,
+     "P10": 21.0,
+     "P50": 55.0,
+     "P90": 116.0
+    },
+    {
+     "actual": 113.0,
+     "P10": 16.0,
+     "P50": 73.1771,
+     "P90": 131.2765
+    },
+    {
+     "actual": 64.0,
+     "P10": 12.0,
+     "P50": 55.0,
+     "P90": 141.8628
+    },
+    {
+     "actual": 48.0,
+     "P10": 24.0,
+     "P50": 72.0975,
+     "P90": 179.0604
+    },
+    {
+     "actual": 10.0,
+     "P10": 12.0,
+     "P50": 47.1175,
+     "P90": 105.9028
+    },
+    {
+     "actual": 56.0,
+     "P10": 21.7143,
+     "P50": 110.0681,
+     "P90": 141.4607
+    },
+    {
+     "actual": 108.0,
+     "P10": 21.0,
+     "P50": 60.4545,
+     "P90": 117.7713
+    },
+    {
+     "actual": 50.0,
+     "P10": 16.0,
+     "P50": 66.399,
+     "P90": 98.0
+    },
+    {
+     "actual": 27.0,
+     "P10": 16.0,
+     "P50": 51.8571,
+     "P90": 116.0
+    },
+    {
+     "actual": 127.0,
+     "P10": 24.0,
+     "P50": 57.2539,
+     "P90": 116.0
+    },
+    {
+     "actual": 24.0,
+     "P10": 19.0,
+     "P50": 24.0675,
+     "P90": 212.191
+    },
+    {
+     "actual": 63.0,
+     "P10": 21.0,
+     "P50": 62.844,
+     "P90": 117.7713
+    }
+   ]
+  },
+  "traffic": {
+   "metrics": [
+    {
+     "model": "Baseline (last week \u00b1 typical change)",
+     "MAE": 119.0,
+     "coverage": 0.9286,
+     "avg_width": 765.0
+    },
+    {
+     "model": "Holt-Winters 80% interval",
+     "MAE": 117.4258,
+     "coverage": 0.8571,
+     "avg_width": 831.1166
+    }
+   ],
+   "overfit": [
+    {
+     "model": "Holt-Winters 80% interval",
+     "train_coverage": 0.8205,
+     "test_coverage": 0.8571,
+     "gap": -0.0366
+    }
+   ]
+  }
+ },
+ "forecast": {
+  "history_dates": [
+   "2020-11-01",
+   "2020-11-02",
+   "2020-11-03",
+   "2020-11-04",
+   "2020-11-05",
+   "2020-11-06",
+   "2020-11-07",
+   "2020-11-08",
+   "2020-11-09",
+   "2020-11-10",
+   "2020-11-11",
+   "2020-11-12",
+   "2020-11-13",
+   "2020-11-14",
+   "2020-11-15",
+   "2020-11-16",
+   "2020-11-17",
+   "2020-11-18",
+   "2020-11-19",
+   "2020-11-20",
+   "2020-11-21",
+   "2020-11-22",
+   "2020-11-23",
+   "2020-11-24",
+   "2020-11-25",
+   "2020-11-26",
+   "2020-11-27",
+   "2020-11-28",
+   "2020-11-29",
+   "2020-11-30",
+   "2020-12-01",
+   "2020-12-02",
+   "2020-12-03",
+   "2020-12-04",
+   "2020-12-05",
+   "2020-12-06",
+   "2020-12-07",
+   "2020-12-08",
+   "2020-12-09",
+   "2020-12-10",
+   "2020-12-11",
+   "2020-12-12",
+   "2020-12-13",
+   "2020-12-14",
+   "2020-12-15",
+   "2020-12-16",
+   "2020-12-17",
+   "2020-12-18",
+   "2020-12-19",
+   "2020-12-20",
+   "2020-12-21",
+   "2020-12-22",
+   "2020-12-23",
+   "2020-12-24",
+   "2020-12-25",
+   "2020-12-26",
+   "2020-12-27",
+   "2020-12-28",
+   "2020-12-29",
+   "2020-12-30",
+   "2020-12-31",
+   "2021-01-01",
+   "2021-01-02",
+   "2021-01-03",
+   "2021-01-04",
+   "2021-01-05",
+   "2021-01-06",
+   "2021-01-07",
+   "2021-01-08",
+   "2021-01-09",
+   "2021-01-10",
+   "2021-01-11",
+   "2021-01-12",
+   "2021-01-13",
+   "2021-01-14",
+   "2021-01-15",
+   "2021-01-16",
+   "2021-01-17",
+   "2021-01-18",
+   "2021-01-19",
+   "2021-01-20",
+   "2021-01-21",
+   "2021-01-22",
+   "2021-01-23",
+   "2021-01-24",
+   "2021-01-25",
+   "2021-01-26",
+   "2021-01-27",
+   "2021-01-28",
+   "2021-01-29",
+   "2021-01-30",
+   "2021-01-31"
+  ],
+  "history_events": [
+   666,
+   1095,
+   1479,
+   1203,
+   1105,
+   1169,
+   873,
+   701,
+   1070,
+   1135,
+   1217,
+   1182,
+   1263,
+   742,
+   695,
+   1169,
+   1414,
+   1344,
+   1208,
+   1252,
+   1083,
+   877,
+   1357,
+   1587,
+   1518,
+   1384,
+   1289,
+   1051,
+   1086,
+   1610,
+   1775,
+   1430,
+   1594,
+   1720,
+   1241,
+   1037,
+   1646,
+   2199,
+   2020,
+   1774,
+   1709,
+   1292,
+   1115,
+   1497,
+   1683,
+   1500,
+   1400,
+   1287,
+   722,
+   723,
+   1011,
+   1026,
+   847,
+   570,
+   461,
+   572,
+   543,
+   766,
+   745,
+   713,
+   587,
+   520,
+   594,
+   567,
+   803,
+   967,
+   1269,
+   1041,
+   908,
+   720,
+   634,
+   889,
+   1148,
+   1001,
+   1074,
+   938,
+   746,
+   620,
+   777,
+   1114,
+   1440,
+   1321,
+   1097,
+   756,
+   689,
+   953,
+   948,
+   1103,
+   962,
+   1031,
+   723,
+   618
+  ],
+  "test_dates": [
+   "2021-01-18",
+   "2021-01-19",
+   "2021-01-20",
+   "2021-01-21",
+   "2021-01-22",
+   "2021-01-23",
+   "2021-01-24",
+   "2021-01-25",
+   "2021-01-26",
+   "2021-01-27",
+   "2021-01-28",
+   "2021-01-29",
+   "2021-01-30",
+   "2021-01-31"
+  ],
+  "test_forecast": [
+   1012.1411,
+   1216.0489,
+   1117.5996,
+   1015.2243,
+   979.3376,
+   718.3279,
+   623.8748,
+   1012.4676,
+   1216.3517,
+   1117.8804,
+   1015.4848,
+   979.5792,
+   718.552,
+   624.0826
+  ],
+  "test_lower": [
+   829.8905,
+   977.518,
+   833.7285,
+   692.312,
+   621.615,
+   328.8901,
+   205.1134,
+   566.3015,
+   744.3677,
+   621.4169,
+   495.6911,
+   437.4566,
+   154.9827,
+   39.852
+  ],
+  "test_upper": [
+   1194.3916,
+   1454.5798,
+   1401.4707,
+   1338.1366,
+   1337.0602,
+   1107.7657,
+   1042.6363,
+   1458.6336,
+   1688.3357,
+   1614.344,
+   1535.2784,
+   1521.7018,
+   1282.1212,
+   1208.3133
+  ],
+  "naive_forecast": [
+   889.0,
+   1148.0,
+   1001.0,
+   1074.0,
+   938.0,
+   746.0,
+   620.0,
+   889.0,
+   1148.0,
+   1001.0,
+   1074.0,
+   938.0,
+   746.0,
+   620.0
+  ],
+  "future_dates": [
+   "2021-02-01",
+   "2021-02-02",
+   "2021-02-03",
+   "2021-02-04",
+   "2021-02-05",
+   "2021-02-06",
+   "2021-02-07",
+   "2021-02-08",
+   "2021-02-09",
+   "2021-02-10",
+   "2021-02-11",
+   "2021-02-12",
+   "2021-02-13",
+   "2021-02-14"
+  ],
+  "future_forecast": [
+   980.9398,
+   1179.0282,
+   1132.3446,
+   1025.4456,
+   983.3863,
+   712.9376,
+   620.4973,
+   981.0336,
+   1179.115,
+   1132.4249,
+   1025.5199,
+   983.4551,
+   713.0013,
+   620.5562
+  ],
+  "future_lower": [
+   793.7359,
+   933.5914,
+   840.0477,
+   692.8201,
+   614.8139,
+   311.621,
+   188.9101,
+   521.1598,
+   692.5946,
+   620.641,
+   489.6601,
+   424.5536,
+   131.9694,
+   18.2049
+  ],
+  "future_upper": [
+   1168.1437,
+   1424.465,
+   1424.6415,
+   1358.0711,
+   1351.9588,
+   1114.2542,
+   1052.0845,
+   1440.9074,
+   1665.6354,
+   1644.2088,
+   1561.3798,
+   1542.3567,
+   1294.0333,
+   1222.9076
+  ]
+ },
+ "p4": {
+  "orders": {
+   "cutoff": 132.0,
+   "n_pos_train": 10,
+   "n_pos_test": 3,
+   "metrics": [
+    {
+     "model": "Baseline (not high-value)",
+     "accuracy": 0.88,
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "auc": 0.5
+    },
+    {
+     "model": "Decision tree",
+     "accuracy": 0.4,
+     "precision": 0.125,
+     "recall": 0.6667,
+     "f1": 0.2105,
+     "auc": 0.4773
+    },
+    {
+     "model": "Logistic regression",
+     "accuracy": 0.72,
+     "precision": 0.1667,
+     "recall": 0.3333,
+     "f1": 0.2222,
+     "auc": 0.5758
+    }
+   ],
+   "cv": [
+    {
+     "model": "Baseline (not high-value)",
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0,
+     "roc_auc": 0.5
+    },
+    {
+     "model": "Decision tree",
+     "precision": 0.0182,
+     "recall": 0.1,
+     "f1": 0.0308,
+     "roc_auc": 0.4239
+    },
+    {
+     "model": "Logistic regression",
+     "precision": 0.12,
+     "recall": 0.4,
+     "f1": 0.1833,
+     "roc_auc": 0.5359
+    }
+   ],
+   "overfit": [
+    {
+     "model": "Baseline (not high-value)",
+     "train_f1": 0.0,
+     "test_f1": 0.0,
+     "gap": 0.0
+    },
+    {
+     "model": "Decision tree",
+     "train_f1": 0.3051,
+     "test_f1": 0.2105,
+     "gap": 0.0946
+    },
+    {
+     "model": "Logistic regression",
+     "train_f1": 0.5263,
+     "test_f1": 0.2222,
+     "gap": 0.3041
+    }
+   ],
+   "tree_rules": "|--- month_Nov <= 0.50\n|   |--- channel_group_Referral <= 0.50\n|   |   |--- country_Other <= 0.50\n|   |   |   |--- class: 1\n|   |   |--- country_Other >  0.50\n|   |   |   |--- class: 0\n|   |--- channel_group_Referral >  0.50\n|   |   |--- class: 1\n|--- month_Nov >  0.50\n|   |--- channel_group_Organic Search <= 0.50\n|   |   |--- channel_group_Referral <= 0.50\n|   |   |   |--- class: 0\n|   |   |--- channel_group_Referral >  0.50\n|   |   |   |--- class: 0\n|   |--- channel_group_Organic Search >  0.50\n|   |   |--- country_United States <= 0.50\n|   |   |   |--- class: 1\n|   |   |--- country_United States >  0.50\n|   |   |   |--- class: 1\n"
+  },
+  "days": {
+   "cutoff": 751.0,
+   "n_pos_train": 19,
+   "n_pos_test": 3,
+   "metrics": [
+    {
+     "model": "Baseline (not quiet)",
+     "accuracy": 0.7857,
+     "precision": 0.0,
+     "recall": 0.0,
+     "f1": 0.0
+    },
+    {
+     "model": "Decision tree",
+     "accuracy": 0.8571,
+     "precision": 0.6,
+     "recall": 1.0,
+     "f1": 0.75
+    },
+    {
+     "model": "Logistic regression",
+     "accuracy": 0.9286,
+     "precision": 0.75,
+     "recall": 1.0,
+     "f1": 0.8571
+    }
+   ],
+   "overfit": [
+    {
+     "model": "Baseline (not quiet)",
+     "train_f1": 0.0,
+     "test_f1": 0.0,
+     "gap": 0.0
+    },
+    {
+     "model": "Decision tree",
+     "train_f1": 0.6957,
+     "test_f1": 0.75,
+     "gap": -0.0543
+    },
+    {
+     "model": "Logistic regression",
+     "train_f1": 0.6957,
+     "test_f1": 0.8571,
+     "gap": -0.1615
+    }
+   ],
+   "tree_rules": "|--- lag7_k <= 0.88\n|   |--- lag7_k <= 0.73\n|   |   |--- day_of_week_Sunday <= 0.50\n|   |   |   |--- class: 1\n|   |   |--- day_of_week_Sunday >  0.50\n|   |   |   |--- class: 1\n|   |--- lag7_k >  0.73\n|   |   |--- class: 1\n|--- lag7_k >  0.88\n|   |--- holiday <= 0.50\n|   |   |--- lag7_k <= 1.32\n|   |   |   |--- class: 0\n|   |   |--- lag7_k >  1.32\n|   |   |   |--- class: 0\n|   |--- holiday >  0.50\n|   |   |--- class: 1\n",
+   "flags": [
+    {
+     "date": "2021-01-18",
+     "weekday": "Monday",
+     "events": 777,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-19",
+     "weekday": "Tuesday",
+     "events": 1114,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-20",
+     "weekday": "Wednesday",
+     "events": 1440,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-21",
+     "weekday": "Thursday",
+     "events": 1321,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-22",
+     "weekday": "Friday",
+     "events": 1097,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-23",
+     "weekday": "Saturday",
+     "events": 756,
+     "actual_quiet": 0,
+     "tree_flag": 1,
+     "logit_flag": 1
+    },
+    {
+     "date": "2021-01-24",
+     "weekday": "Sunday",
+     "events": 689,
+     "actual_quiet": 1,
+     "tree_flag": 1,
+     "logit_flag": 1
+    },
+    {
+     "date": "2021-01-25",
+     "weekday": "Monday",
+     "events": 953,
+     "actual_quiet": 0,
+     "tree_flag": 1,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-26",
+     "weekday": "Tuesday",
+     "events": 948,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-27",
+     "weekday": "Wednesday",
+     "events": 1103,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-28",
+     "weekday": "Thursday",
+     "events": 962,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-29",
+     "weekday": "Friday",
+     "events": 1031,
+     "actual_quiet": 0,
+     "tree_flag": 0,
+     "logit_flag": 0
+    },
+    {
+     "date": "2021-01-30",
+     "weekday": "Saturday",
+     "events": 723,
+     "actual_quiet": 1,
+     "tree_flag": 1,
+     "logit_flag": 1
+    },
+    {
+     "date": "2021-01-31",
+     "weekday": "Sunday",
+     "events": 618,
+     "actual_quiet": 1,
+     "tree_flag": 1,
+     "logit_flag": 1
+    }
+   ]
+  }
+ },
+ "summary": [
+  {
+   "problem": "#1",
+   "task": "Buyer",
+   "model": "Logistic regression",
+   "metric": "AUC",
+   "model_value": 0.8991,
+   "baseline_value": 0.5,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#1",
+   "task": "Buyer",
+   "model": "Gradient boosting",
+   "metric": "AUC",
+   "model_value": 0.8935,
+   "baseline_value": 0.5,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#2",
+   "task": "Order value",
+   "model": "Ridge regression",
+   "metric": "MAE ($)",
+   "model_value": 33.0485,
+   "baseline_value": 33.44,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#2",
+   "task": "Daily traffic",
+   "model": "Holt-Winters",
+   "metric": "MAE (events)",
+   "model_value": 117.4258,
+   "baseline_value": 119.0,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#3",
+   "task": "Order range",
+   "model": "Quantile regression",
+   "metric": "|coverage \u2212 80%|",
+   "model_value": 0.04,
+   "baseline_value": 0.0,
+   "beats_baseline": false
+  },
+  {
+   "problem": "#3",
+   "task": "Traffic range",
+   "model": "Holt-Winters interval",
+   "metric": "|coverage \u2212 80%|",
+   "model_value": 0.0571,
+   "baseline_value": 0.1286,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#4",
+   "task": "High-value order",
+   "model": "Decision tree",
+   "metric": "Recall",
+   "model_value": 0.6667,
+   "baseline_value": 0.0,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#4",
+   "task": "High-value order",
+   "model": "Logistic regression",
+   "metric": "Recall",
+   "model_value": 0.3333,
+   "baseline_value": 0.0,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#4",
+   "task": "Quiet day",
+   "model": "Decision tree",
+   "metric": "Recall",
+   "model_value": 1.0,
+   "baseline_value": 0.0,
+   "beats_baseline": true
+  },
+  {
+   "problem": "#4",
+   "task": "Quiet day",
+   "model": "Logistic regression",
+   "metric": "Recall",
+   "model_value": 1.0,
+   "baseline_value": 0.0,
+   "beats_baseline": true
+  }
+ ],
+ "overfit_summary": [
+  {
+   "task": "#1 Buyer",
+   "model": "Logistic regression",
+   "metric": "AUC",
+   "train": 0.9047,
+   "test": 0.8991,
+   "train \u2212 test": 0.0057
+  },
+  {
+   "task": "#1 Buyer",
+   "model": "Gradient boosting",
+   "metric": "AUC",
+   "train": 0.9205,
+   "test": 0.8935,
+   "train \u2212 test": 0.027
+  },
+  {
+   "task": "#2 Order value",
+   "model": "Ridge regression",
+   "metric": "RMSE ($)",
+   "train": 83.0955,
+   "test": 51.3608,
+   "train \u2212 test": 31.7346
+  },
+  {
+   "task": "#2 Daily traffic",
+   "model": "Holt-Winters",
+   "metric": "MAE (events)",
+   "train": 109.5519,
+   "test": 117.4258,
+   "train \u2212 test": -7.874
+  },
+  {
+   "task": "#3 Order range",
+   "model": "Quantile regression",
+   "metric": "Coverage",
+   "train": 0.898,
+   "test": 0.76,
+   "train \u2212 test": 0.138
+  },
+  {
+   "task": "#3 Traffic range",
+   "model": "Holt-Winters interval",
+   "metric": "Coverage",
+   "train": 0.8205,
+   "test": 0.8571,
+   "train \u2212 test": -0.0366
+  },
+  {
+   "task": "#4 High-value order",
+   "model": "Decision tree",
+   "metric": "F1",
+   "train": 0.3051,
+   "test": 0.2105,
+   "train \u2212 test": 0.0946
+  },
+  {
+   "task": "#4 High-value order",
+   "model": "Logistic regression",
+   "metric": "F1",
+   "train": 0.5263,
+   "test": 0.2222,
+   "train \u2212 test": 0.3041
+  },
+  {
+   "task": "#4 Quiet day",
+   "model": "Decision tree",
+   "metric": "F1",
+   "train": 0.6957,
+   "test": 0.75,
+   "train \u2212 test": -0.0543
+  },
+  {
+   "task": "#4 Quiet day",
+   "model": "Logistic regression",
+   "metric": "F1",
+   "train": 0.6957,
+   "test": 0.8571,
+   "train \u2212 test": -0.1615
+  }
+ ],
+ "meta": {
+  "generated_at": "2026-10-31T11:14:10",
+  "source_csv": "BigQuery_4M_100k_cleaned.csv",
+  "random_state": 42,
+  "n_rows": 100000,
+  "n_visitors": 42610,
+  "n_orders": 123,
+  "n_days": 92,
+  "train_days": [
+   "2020-11-01",
+   "2021-01-17"
+  ],
+  "test_days": [
+   "2021-01-18",
+   "2021-01-31"
+  ]
+ }
+}
