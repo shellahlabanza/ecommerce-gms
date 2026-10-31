@@ -313,6 +313,57 @@ html, body {
   color: var(--primary-foreground);
   border-color: var(--primary);
 }
+.chart-tabs.wrap { display: flex; flex-wrap: wrap; margin: 6px 0 10px; }
+
+/* ---------- Predictions panel ---------- */
+
+.mini-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 10px 0 2px;
+}
+
+/* chart first, exact numbers on demand */
+.table-toggle { margin-top: 12px; }
+.table-toggle > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  user-select: none;
+}
+.table-toggle > summary:hover { color: var(--foreground); }
+.table-toggle[open] > summary { margin-bottom: 8px; }
+
+/* quiet-day flag grid: one column per test day */
+.flag-grid {
+  display: grid;
+  grid-template-columns: 96px repeat(14, minmax(0, 1fr));
+  gap: 3px;
+  margin-top: 12px;
+  font-size: 11px;
+  align-items: center;
+}
+.flag-head { text-align: center; color: var(--muted-foreground); line-height: 1.2; }
+.flag-name { color: var(--foreground); font-weight: 600; white-space: nowrap; }
+.flag-cell {
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 11px;
+  background: var(--muted);
+}
+.flag-cell.actual { background: var(--chart-3); }
+.flag-cell.hit { background: var(--chart-1); color: #fff; }
+.flag-cell.false { background: var(--card); border: 2px solid var(--chart-4); color: var(--chart-4); }
+.flag-cell.miss { background: var(--card); border: 2px solid var(--destructive); color: var(--destructive); }
+.flag-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 11px; color: var(--muted-foreground); }
+.flag-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.flag-legend .flag-cell { width: 22px; display: inline-flex; }
 
 /* ---------- Stats strip (central tendency / dispersion / position) ---------- */
 

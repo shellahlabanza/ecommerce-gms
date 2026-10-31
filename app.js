@@ -27,6 +27,7 @@ function readPalette() {
   PALETTE.muted = get('--muted-foreground');
   PALETTE.border = get('--border');
   PALETTE.fg = get('--foreground');
+  PALETTE.destructive = get('--destructive');
   PALETTE.series = [PALETTE.chart1, PALETTE.chart3, PALETTE.chart4, PALETTE.chart2, PALETTE.chart5];
 }
 
@@ -221,7 +222,7 @@ function makeBar(id, labels, data, opts = {}) {
   const horizontal = opts.horizontal;
   const fmt = opts.fmt || fmtInt;
   const total = opts.total;
-  const textFor = (i) => (total ? [fmtPct(data[i] / total), fmt(data[i])] : fmt(data[i]));
+  const textFor = opts.labelFor || ((i) => (total ? [fmtPct(data[i] / total), fmt(data[i])] : fmt(data[i])));
   const ctx = document.getElementById(id).getContext('2d');
   state.charts[id] = new Chart(ctx, {
     type: 'bar',
@@ -233,17 +234,17 @@ function makeBar(id, labels, data, opts = {}) {
       indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
       // room for the labels past the end of the longest bar
-      layout: { padding: horizontal ? { right: total ? 110 : 60 } : { top: total ? 32 : 18 } },
+      layout: { padding: horizontal ? { right: opts.padRight || (total ? 110 : 60) } : { top: total ? 32 : 18 } },
       plugins: {
         legend: { display: false },
         tooltip: { callbacks: { label: (c) => (total ? `${fmt(c.raw)} (${fmtPct(c.raw / total)})` : fmt(c.raw)) } },
       },
       // the labels carry the values, so the value axis is hidden
       scales: horizontal
-        ? { x: { display: false, beginAtZero: true }, y: { grid: { display: false }, border: { display: false } } }
-        : { x: { grid: { display: false } }, y: { display: false, beginAtZero: true } },
+        ? { x: { display: false, beginAtZero: true, max: opts.max }, y: { grid: { display: false }, border: { display: false } } }
+        : { x: { grid: { display: false } }, y: { display: false, beginAtZero: true, max: opts.max } },
     },
-    plugins: [barLabelPlugin(textFor, horizontal)],
+    plugins: [barLabelPlugin(textFor, horizontal), ...(opts.plugins || [])],
   });
 }
 
@@ -1046,6 +1047,337 @@ const fmtUsdOrDash = (v) => (v == null ? '—' : '$' + Number(v).toFixed(2));
 const fmtIntOrDash = (v) => (v == null ? '—' : fmtInt(Math.round(v)));
 const num = (label) => ({ label, num: true });
 
+// ----- Chart helpers used only by the Predictions panel
+
+const BAND = 'rgba(42, 161, 179, 0.22)';         // 80% range fill (forecast)
+const BAND_STRONG = 'rgba(42, 161, 179, 0.38)';  // 80% range bars (orders)
+const fmtPct0 = (v) => (v == null ? '—' : Math.round(v * 100) + '%');
+const shortDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const weekdayOf = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+
+// Same colour for the same kind of model in every chart.
+function modelColor(model) {
+  if (model.startsWith('Baseline')) return PALETTE.muted;
+  if (model.startsWith('Gradient') || model.startsWith('Decision')) return PALETTE.chart3;
+  return PALETTE.chart1;
+}
+
+// "country_Spain" -> "Country: Spain", "n_scroll" -> "Scroll events"
+function prettyFeature(f) {
+  const named = { n_scroll: 'Scroll events', n_page_view: 'Page views', n_view_item: 'Item views', n_session_start: 'Sessions' };
+  if (named[f]) return named[f];
+  const m = f.match(/^(country|channel_group|device_category|month|day_of_week)_(.+)$/);
+  if (!m) return f;
+  const prefix = { country: 'Country', channel_group: 'Channel', device_category: 'Device', month: 'Month', day_of_week: 'Day' }[m[1]];
+  return `${prefix}: ${m[2]}`;
+}
+
+// Dashed reference line (target / cut-off) across the plot on the given value axis.
+function refLinePlugin(value, text, axisId) {
+  return {
+    id: 'refLine',
+    afterDatasetsDraw(chart) {
+      const { ctx, chartArea: a } = chart;
+      const scale = chart.scales[axisId];
+      const p = scale.getPixelForValue(value);
+      ctx.save();
+      ctx.strokeStyle = PALETTE.fg;
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      if (scale.isHorizontal()) { ctx.moveTo(p, a.top); ctx.lineTo(p, a.bottom); } else { ctx.moveTo(a.left, p); ctx.lineTo(a.right, p); }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = PALETTE.fg;
+      ctx.font = `600 11px ${Chart.defaults.font.family}`;
+      if (scale.isHorizontal()) {
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillText(text, p + 4, a.top + 2);
+      } else {
+        ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+        ctx.fillText(text, a.right, p - 3);
+      }
+      ctx.restore();
+    },
+  };
+}
+
+// Grouped bars on one shared value axis, with a legend naming each group.
+function makeGroupedBar(id, labels, sets, opts = {}) {
+  killChart(id);
+  const horizontal = !!opts.horizontal;
+  const fmt = opts.fmt || fmt2;
+  const valueAxis = {
+    beginAtZero: true, min: opts.min, max: opts.max,
+    grid: { color: PALETTE.border }, border: { display: false },
+    ticks: { callback: (v) => fmt(v), maxTicksLimit: 6 },
+  };
+  const catAxis = { grid: { display: false }, border: { display: false } };
+  state.charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: sets.map((s) => ({ borderRadius: 4, maxBarThickness: 22, categoryPercentage: 0.72, barPercentage: 0.9, ...s })),
+    },
+    options: {
+      indexAxis: horizontal ? 'y' : 'x',
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: sets.length > 1, position: 'top', align: 'start' },
+        tooltip: {
+          filter: (item) => item.raw != null,
+          callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` },
+        },
+      },
+      scales: horizontal ? { x: valueAxis, y: catAxis } : { x: catAxis, y: valueAxis },
+    },
+    plugins: opts.plugins || [],
+  });
+}
+
+// ----- Forecast card with sub-tabs (one line at a time)
+
+function renderForecast(P) {
+  const F = P.forecast;
+  const labels = [...F.history_dates, ...F.future_dates];
+  const nHist = F.history_dates.length, nFut = F.future_dates.length, last = labels.length - 1;
+  const testStart = F.history_dates.indexOf(F.test_dates[0]);
+  const zoomFrom = Math.max(0, testStart - 14);
+  const place = (arr, start) => labels.map((_, i) => (i >= start && i < start + arr.length ? arr[i - start] : null));
+  const line = (label, data, color, extra = {}) => ({ label, data, borderColor: color, backgroundColor: color,
+    pointRadius: 0, pointHoverRadius: 4, borderWidth: 2, tension: 0.25, spanGaps: false, fill: false, ...extra });
+  const actualData = [...F.history_events, ...new Array(nFut).fill(null)];
+
+  // Fresh dataset objects on every draw (Chart.js mutates them).
+  const S = {
+    actual: () => line('Actual', actualData, PALETTE.fg, { borderWidth: 1.75 }),
+    actualGrey: () => line('Actual', actualData, PALETTE.muted, { borderWidth: 1.5 }),
+    testBand: (name) => [
+      line('_test_lower', place(F.test_lower, testStart), 'transparent', { borderWidth: 0 }),
+      line(name, place(F.test_upper, testStart), 'transparent', { borderWidth: 0, fill: '-1', backgroundColor: BAND }),
+    ],
+    futureBand: (name) => [
+      line('_future_lower', place(F.future_lower, nHist), 'transparent', { borderWidth: 0 }),
+      line(name, place(F.future_upper, nHist), 'transparent', { borderWidth: 0, fill: '-1', backgroundColor: BAND }),
+    ],
+    hw: () => line('Holt-Winters (test)', place(F.test_forecast, testStart), PALETTE.chart1, { borderWidth: 2.5 }),
+    naive: () => line('Seasonal naive (baseline)', place(F.naive_forecast, testStart), PALETTE.chart4, { borderDash: [5, 4], borderWidth: 2 }),
+    future: () => line('Forecast Feb 1–14', place(F.future_forecast, nHist), PALETTE.chart3, { borderDash: [6, 3], borderWidth: 2.5 }),
+  };
+
+  // Numbers for the captions
+  const tm = P.p2.traffic.metrics;
+  const hwMae = fmtIntOrDash((tm.find((r) => r.model === 'Holt-Winters') || {}).MAE);
+  const naiveMae = fmtIntOrDash((tm.find((r) => r.model.startsWith('Baseline')) || {}).MAE);
+  const testActual = F.history_events.slice(testStart, testStart + F.test_dates.length);
+  const inside = testActual.filter((v, i) => v >= F.test_lower[i] && v <= F.test_upper[i]).length;
+  const ev = F.history_events;
+  const iMax = ev.indexOf(Math.max(...ev)), iMin = ev.indexOf(Math.min(...ev));
+  const ff = F.future_forecast;
+  const fMax = ff.indexOf(Math.max(...ff)), fMin = ff.indexOf(Math.min(...ff));
+
+  const MODES = {
+    all: {
+      sets: () => [S.actual(), ...S.testBand('80% range'), S.hw(), S.naive(), ...S.futureBand('_future_upper'), S.future()],
+      from: 0, to: last,
+      caption: 'Every line together. Pick a tab above to see one line at a time.',
+    },
+    actual: {
+      sets: () => [S.actual()], from: 0, to: nHist - 1,
+      caption: `Real events per day, ${shortDate(F.history_dates[0])} – ${shortDate(F.history_dates[nHist - 1])}. Weekdays are busier than weekends. ` +
+        `Busiest day: ${shortDate(F.history_dates[iMax])} (${fmtInt(ev[iMax])}); quietest: ${shortDate(F.history_dates[iMin])} (${fmtInt(ev[iMin])}).`,
+    },
+    range: {
+      sets: () => [S.actualGrey(), ...S.testBand('80% range'), ...S.futureBand('_future_upper')], from: zoomFrom, to: last,
+      caption: `The shaded band is where the model expects about 80% of days to land. ${inside} of ${testActual.length} test days ` +
+        `(${fmtPct0(inside / testActual.length)}) fell inside it. Grey is the actual traffic.`,
+    },
+    hw: {
+      sets: () => [S.actualGrey(), S.hw()], from: zoomFrom, to: nHist - 1,
+      caption: `The model's guess for each test day (${shortDate(F.test_dates[0])} – ${shortDate(F.test_dates[F.test_dates.length - 1])}) next to what really happened (grey). ` +
+        `On average it was off by ${hwMae} events a day.`,
+    },
+    naive: {
+      sets: () => [S.actualGrey(), S.naive()], from: zoomFrom, to: nHist - 1,
+      caption: `The baseline just repeats the same weekday from the week before. It was off by ${naiveMae} events a day, ` +
+        `so Holt-Winters (${hwMae}) is only slightly better.`,
+    },
+    future: {
+      sets: () => [S.actualGrey(), ...S.futureBand('80% range'), S.future()], from: zoomFrom, to: last,
+      caption: `The next two weeks, which have no real data yet. Busiest: ${weekdayOf(F.future_dates[fMax])}s (~${fmtInt(Math.round(ff[fMax]))}); ` +
+        `quietest: ${weekdayOf(F.future_dates[fMin])}s (~${fmtInt(Math.round(ff[fMin]))}). The band widens day by day because the further ahead the model looks, the less sure it is.`,
+    },
+  };
+
+  const draw = () => {
+    const mode = MODES[state.prForecastMode] || MODES.all;
+    const sets = mode.sets();
+    document.getElementById('pr-forecast-caption').textContent = mode.caption;
+    makeLine('pr-forecast', labels.map((d) => shortDate(d)), sets, {
+      plugins: {
+        legend: { display: sets.filter((s) => !s.label.startsWith('_')).length > 1, labels: { filter: (item) => !item.text.startsWith('_') } },
+        tooltip: {
+          filter: (item) => !item.dataset.label.startsWith('_') && item.raw != null,
+          callbacks: { label: (c) => `${c.dataset.label}: ${fmtInt(Math.round(c.raw))}` },
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10 }, min: mode.from, max: mode.to },
+        y: { grid: { color: PALETTE.border }, beginAtZero: true, ticks: { callback: (v) => fmtInt(v) } },
+      },
+    });
+  };
+
+  if (!state.prForecastMode) state.prForecastMode = 'all';
+  const btns = document.querySelectorAll('#pr-forecast-tabs .chart-tab');
+  btns.forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === state.prForecastMode);
+    if (!b._hasListener) {
+      b.addEventListener('click', () => {
+        state.prForecastMode = b.dataset.mode;
+        btns.forEach((bb) => bb.classList.toggle('active', bb === b));
+        draw();
+      });
+      b._hasListener = true;
+    }
+  });
+  draw();
+}
+
+// ----- Odds ratios: bars grow left/right from 1 on a log axis
+
+function renderOdds(P) {
+  killChart('pr-p1-odds-chart');
+  const rows = [...P.p1.odds_ratios].sort((a, b) => b.odds_ratio - a.odds_ratio);
+  const labels = rows.map((r) => prettyFeature(r.feature));
+  const up = rows.map((r) => (r.odds_ratio >= 1 ? [1, r.odds_ratio] : null));
+  const down = rows.map((r) => (r.odds_ratio < 1 ? [r.odds_ratio, 1] : null));
+  const ors = rows.map((r) => r.odds_ratio);
+  const lo = Math.min(0.5, ...ors) * 0.75, hi = Math.max(2, ...ors) * 1.35;
+  const labelPlugin = {
+    id: 'oddsLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = `600 11px ${Chart.defaults.font.family}`;
+      ctx.fillStyle = PALETTE.fg;
+      ctx.textBaseline = 'middle';
+      chart.data.datasets.forEach((ds, di) => {
+        chart.getDatasetMeta(di).data.forEach((bar, i) => {
+          if (ds.data[i] == null) return;
+          const raising = ors[i] >= 1;
+          const end = raising ? Math.max(bar.x, bar.base) : Math.min(bar.x, bar.base);
+          ctx.textAlign = raising ? 'left' : 'right';
+          ctx.fillText('×' + fmt2(ors[i]), end + (raising ? 5 : -5), bar.y);
+        });
+      });
+      ctx.restore();
+    },
+  };
+  state.charts['pr-p1-odds-chart'] = new Chart(document.getElementById('pr-p1-odds-chart').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Raises the odds', data: up, backgroundColor: PALETTE.chart3, borderRadius: 4, grouped: false, maxBarThickness: 18 },
+        { label: 'Lowers the odds', data: down, backgroundColor: PALETTE.chart4, borderRadius: 4, grouped: false, maxBarThickness: 18 },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start' },
+        tooltip: { filter: (item) => item.raw != null, callbacks: { label: (c) => `Odds ratio ×${fmt2(ors[c.dataIndex])}` } },
+      },
+      scales: {
+        x: {
+          type: 'logarithmic', min: lo, max: hi,
+          grid: { color: (c) => (c.tick && c.tick.value === 1 ? PALETTE.fg : PALETTE.border) },
+          border: { display: false },
+          afterBuildTicks: (axis) => { axis.ticks = [0.5, 1, 2, 3].filter((v) => v >= lo && v <= hi).map((v) => ({ value: v })); },
+          ticks: { callback: (v) => '×' + v },
+        },
+        y: { grid: { display: false }, border: { display: false } },
+      },
+    },
+    plugins: [labelPlugin],
+  });
+}
+
+// ----- Order-value ranges: one floating bar per test order + the actual value
+
+function renderOrderRanges(P) {
+  killChart('pr-p3-ranges');
+  const tr = [...P.p3.orders.test_ranges].sort((a, b) => a.actual - b.actual);
+  const isIn = (r) => r.actual >= r.P10 && r.actual <= r.P90;
+  const nIn = tr.filter(isIn).length;
+  const outs = tr.filter((r) => !isIn(r));
+  const dot = (label, data, color, style) => ({
+    type: 'line', label, data, showLine: false, pointStyle: style, pointRadius: style === 'rectRot' ? 6 : 4.5, pointHoverRadius: 7,
+    pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 1.5, borderColor: color, backgroundColor: color,
+  });
+  state.charts['pr-p3-ranges'] = new Chart(document.getElementById('pr-p3-ranges').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: tr.map((_, i) => String(i + 1)),
+      datasets: [
+        dot('Actual (inside range)', tr.map((r) => (isIn(r) ? r.actual : null)), PALETTE.chart1, 'circle'),
+        dot('Actual (outside range)', tr.map((r) => (isIn(r) ? null : r.actual)), PALETTE.destructive, 'rectRot'),
+        { type: 'bar', label: '80% range (P10–P90)', data: tr.map((r) => [r.P10, r.P90]), backgroundColor: BAND_STRONG,
+          borderRadius: 4, barPercentage: 0.75, categoryPercentage: 0.9 },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', align: 'start' },
+        tooltip: {
+          filter: (item) => item.raw != null,
+          callbacks: {
+            title: (items) => `Test order ${items[0].label}`,
+            label: (c) => (Array.isArray(c.raw) ? `Range: $${Math.round(c.raw[0])} – $${Math.round(c.raw[1])}` : `Actual: $${Math.round(c.raw)}`),
+          },
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, title: { display: true, text: 'Test orders, smallest to largest' } },
+        y: { beginAtZero: true, grid: { color: PALETTE.border }, border: { display: false }, ticks: { callback: (v) => '$' + v } },
+      },
+    },
+  });
+  const small = outs.filter((r) => r.actual < r.P10).length;
+  document.getElementById('pr-p3-note').textContent =
+    `${nIn} of ${tr.length} test orders (${fmtPct0(nIn / tr.length)}) landed inside their predicted range, a little under the 80% target. ` +
+    `Of the ${outs.length} misses, ${small} were smaller than predicted and ${outs.length - small} larger (up to $${Math.round(Math.max(...tr.map((r) => r.actual)))}).`;
+}
+
+// ----- Quiet days: events per test day + a grid of what each model flagged
+
+function renderQuietDays(P) {
+  const D = P.p4.days;
+  const labels = D.flags.map((r) => [r.weekday.slice(0, 2), r.date.slice(8)]);
+  makeGroupedBar('pr-p4-days-bars', labels, [
+    { label: 'Quiet day', data: D.flags.map((r) => (r.actual_quiet ? r.events : null)), backgroundColor: PALETTE.chart3, grouped: false },
+    { label: 'Normal day', data: D.flags.map((r) => (r.actual_quiet ? null : r.events)), backgroundColor: PALETTE.border, grouped: false },
+  ], { fmt: fmtIntOrDash, plugins: [refLinePlugin(D.cutoff, `Cut-off ${fmtInt(D.cutoff)}`, 'y')] });
+
+  const cell = (flag, actual) => {
+    const kind = flag && actual ? 'hit' : flag ? 'false' : actual ? 'miss' : 'none';
+    const sym = { hit: '✓', false: '!', miss: '✗', none: '' }[kind];
+    return `<div class="flag-cell ${kind}">${sym}</div>`;
+  };
+  const head = D.flags.map((r) => `<div class="flag-head">${r.weekday.slice(0, 2)}<br>${r.date.slice(8)}</div>`).join('');
+  const row = (name, cells) => `<div class="flag-name">${name}</div>${cells}`;
+  document.getElementById('pr-p4-flag-grid').innerHTML =
+    `<div></div>${head}` +
+    row('Actually quiet', D.flags.map((r) => `<div class="flag-cell ${r.actual_quiet ? 'actual' : 'none'}"></div>`).join('')) +
+    row('Decision tree', D.flags.map((r) => cell(r.tree_flag, r.actual_quiet)).join('')) +
+    row('Logistic', D.flags.map((r) => cell(r.logit_flag, r.actual_quiet)).join(''));
+}
+
 function renderPredictions() {
   const P = state.predictions;
   document.getElementById('pr-missing').style.display = P ? 'none' : '';
@@ -1088,65 +1420,69 @@ function renderPredictions() {
   renderTable(document.getElementById('pr-summary'),
     [{ label: 'Problem' }, { label: 'Task' }, { label: 'Model' }, { label: 'Main metric' }, num('Model'), num('Baseline'), { label: 'Beats baseline?' }],
     summary.map((r) => [r.problem, r.task, r.model, r.metric, fmtMetric(r.metric, r.model_value),
-      fmtMetric(r.metric, r.baseline_value), r.beats_baseline ? 'Yes' : 'No']));
+      fmtMetric(r.metric, r.baseline_value), r.beats_baseline ? '✓ Yes' : '✗ No']));
 
-  // ----- Forecast chart
-  const F = P.forecast;
-  const labels = [...F.history_dates, ...F.future_dates];
-  const nHist = F.history_dates.length, nFut = F.future_dates.length;
-  const testStart = F.history_dates.indexOf(F.test_dates[0]);
-  const place = (arr, start) => labels.map((_, i) => (i >= start && i < start + arr.length ? arr[i - start] : null));
-  const band = 'rgba(42, 161, 179, 0.18)';
-  const line = (label, data, color, extra = {}) => ({ label, data, borderColor: color, backgroundColor: color,
-    pointRadius: 0, borderWidth: 2, tension: 0.25, spanGaps: false, fill: false, ...extra });
-  makeLine('pr-forecast', labels.map((d) => d.slice(5)), [
-    line('Actual', [...F.history_events, ...new Array(nFut).fill(null)], PALETTE.fg, { borderWidth: 1.5 }),
-    line('_test_lower', place(F.test_lower, testStart), 'transparent', { borderWidth: 0 }),
-    line('80% range', place(F.test_upper, testStart), 'transparent', { borderWidth: 0, fill: '-1', backgroundColor: band }),
-    line('Holt-Winters (test)', place(F.test_forecast, testStart), PALETTE.chart1),
-    line('Seasonal naive (baseline)', place(F.naive_forecast, testStart), PALETTE.chart4, { borderDash: [5, 4], borderWidth: 1.5 }),
-    line('_future_lower', place(F.future_lower, nHist), 'transparent', { borderWidth: 0 }),
-    line('_future_upper', place(F.future_upper, nHist), 'transparent', { borderWidth: 0, fill: '-1', backgroundColor: band }),
-    line('Forecast Feb 1–14', place(F.future_forecast, nHist), PALETTE.chart3, { borderDash: [6, 3] }),
-  ], {
-    plugins: {
-      legend: { display: true, labels: { filter: (item) => !item.text.startsWith('_') } },
-      tooltip: { filter: (item) => !item.dataset.label.startsWith('_') && item.raw != null,
-        callbacks: { label: (c) => `${c.dataset.label}: ${fmtInt(Math.round(c.raw))}` } },
-    },
-  });
+  // ----- Forecast (sub-tabs)
+  renderForecast(P);
 
   // ----- Problem #1
+  makeGroupedBar('pr-p1-chart', ['Precision', 'Recall', 'F1', 'AUC'],
+    P.p1.metrics.map((r) => ({ label: r.model, data: [r.precision, r.recall, r.f1, r.auc], backgroundColor: modelColor(r.model) })),
+    { min: 0, max: 1, fmt: fmt2 });
+  document.getElementById('pr-p1-note').textContent =
+    `Logistic regression catches ${fmtPct0(lr1.recall)} of real buyers (recall), but only ${fmtPctOrDash(lr1.precision)} of the visitors it flags actually buy (precision), ` +
+    `because just ${fmtInt(P.p1.n_buyers)} of ${fmtInt(P.p1.n_visitors)} visitors are buyers. ` +
+    `Its ranking is still useful: the top 1% of visitors it ranks highest contain ${fmtPct0(P.p1.share_buyers_top1pct)} of all test buyers.`;
   renderTable(document.getElementById('pr-p1-metrics'),
     [{ label: 'Model' }, num('Accuracy'), num('Precision'), num('Recall'), num('F1'), num('AUC')],
     P.p1.metrics.map((r) => [r.model, fmtPctOrDash(r.accuracy), fmt3(r.precision), fmt3(r.recall), fmt3(r.f1), fmt3(r.auc)]));
-  document.getElementById('pr-p1-note').textContent =
-    `${fmtInt(P.p1.n_buyers)} buyers among ${fmtInt(P.p1.n_visitors)} visitors. ` +
-    `The top 1% of test visitors ranked by the model contain ${fmtPctOrDash(P.p1.share_buyers_top1pct)} of all test buyers.`;
+  renderOdds(P);
   renderTable(document.getElementById('pr-p1-odds'),
     [{ label: 'Feature' }, num('Odds ratio')],
-    P.p1.odds_ratios.map((r) => [r.feature, fmt2(r.odds_ratio)]));
+    P.p1.odds_ratios.map((r) => [prettyFeature(r.feature), fmt2(r.odds_ratio)]));
 
   // ----- Problem #2
+  const om = P.p2.orders.metrics, tmx = P.p2.traffic.metrics;
+  makeBar('pr-p2-orders-chart', om.map((r) => r.model), om.map((r) => r.MAE),
+    { horizontal: true, color: om.map((r) => modelColor(r.model)), fmt: fmtUsdOrDash });
+  makeBar('pr-p2-traffic-chart', tmx.map((r) => r.model), tmx.map((r) => r.MAE),
+    { horizontal: true, color: tmx.map((r) => modelColor(r.model)), fmt: fmtIntOrDash });
+  const omB = om.find((r) => r.model.startsWith('Baseline')) || {}, omM = om.find((r) => !r.model.startsWith('Baseline')) || {};
+  document.getElementById('pr-p2-note').textContent =
+    `Both models beat their baseline, but only just: order value by ${fmtUsdOrDash(omB.MAE - omM.MAE)} per order, ` +
+    `daily traffic by ${fmtIntOrDash(hwBase.MAE - hw.MAE)} events per day.`;
   renderTable(document.getElementById('pr-p2-orders'),
     [{ label: 'Order value' }, num('MAE'), num('RMSE'), num('R²')],
-    P.p2.orders.metrics.map((r) => [r.model, fmtUsdOrDash(r.MAE), fmtUsdOrDash(r.RMSE), fmt3(r.R2)]));
+    om.map((r) => [r.model, fmtUsdOrDash(r.MAE), fmtUsdOrDash(r.RMSE), fmt3(r.R2)]));
   renderTable(document.getElementById('pr-p2-traffic'),
     [{ label: 'Daily traffic' }, num('MAE'), num('RMSE')],
-    P.p2.traffic.metrics.map((r) => [r.model, fmtIntOrDash(r.MAE), fmtIntOrDash(r.RMSE)]));
+    tmx.map((r) => [r.model, fmtIntOrDash(r.MAE), fmtIntOrDash(r.RMSE)]));
   const wk = P.p2.traffic.weekday_effects || [];
   makeBar('pr-weekday', wk.map((r) => r.weekday.slice(0, 3)), wk.map((r) => Math.round(r.effect_vs_average_day)),
-    { color: PALETTE.chart2, fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v) });
+    { color: wk.map((r) => (r.effect_vs_average_day >= 0 ? PALETTE.chart1 : PALETTE.chart4)), fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v) });
 
   // ----- Problem #3
-  const p3rows = [
-    ...P.p3.orders.metrics.map((r) => ['Order value', r.model, fmtUsdOrDash(r.MAE_P50), fmtPctOrDash(r.coverage), fmtUsdOrDash(r.avg_width)]),
-    ...P.p3.traffic.metrics.map((r) => ['Daily traffic', r.model, fmtIntOrDash(r.MAE), fmtPctOrDash(r.coverage), fmtIntOrDash(r.avg_width)]),
+  const p3all = [
+    ...P.p3.orders.metrics.map((r) => ({ task: 'Order value', r, width: fmtUsdOrDash(r.avg_width), mae: fmtUsdOrDash(r.MAE_P50) })),
+    ...P.p3.traffic.metrics.map((r) => ({ task: 'Daily traffic', r, width: fmtIntOrDash(r.avg_width), mae: fmtIntOrDash(r.MAE) })),
   ];
+  makeBar('pr-p3-chart', p3all.map((x) => [x.task, x.r.model.replace(/\s*\(.*\)$/, '')]), p3all.map((x) => x.r.coverage), {
+    horizontal: true, max: 1, padRight: 120,
+    color: p3all.map((x) => modelColor(x.r.model)),
+    labelFor: (i) => `${fmtPct0(p3all[i].r.coverage)} · width ${p3all[i].width}`,
+    fmt: fmtPct0,
+    plugins: [refLinePlugin(0.8, '80% target', 'x')],
+  });
   renderTable(document.getElementById('pr-p3'),
-    [{ label: 'Task' }, { label: 'Model' }, num('MAE (middle)'), num('Coverage'), num('Avg width')], p3rows);
+    [{ label: 'Task' }, { label: 'Model' }, num('MAE (middle)'), num('Coverage'), num('Avg width')],
+    p3all.map((x) => [x.task, x.r.model, x.mae, fmtPctOrDash(x.r.coverage), x.width]));
+  renderOrderRanges(P);
 
   // ----- Problem #4
+  const p4Sets = (rows) => rows.filter((r) => !r.model.startsWith('Baseline'))
+    .map((r) => ({ label: r.model, data: [r.precision, r.recall, r.f1], backgroundColor: modelColor(r.model) }));
+  makeGroupedBar('pr-p4-orders-chart', ['Precision', 'Recall', 'F1'], p4Sets(P.p4.orders.metrics), { min: 0, max: 1, fmt: fmt2 });
+  makeGroupedBar('pr-p4-days-chart', ['Precision', 'Recall', 'F1'], p4Sets(P.p4.days.metrics), { min: 0, max: 1, fmt: fmt2 });
   const p4rows = [
     ...P.p4.orders.metrics.map((r) => ['High-value order', r.model, fmt3(r.precision), fmt3(r.recall), fmt3(r.f1), fmt3(r.auc), fmtPctOrDash(r.accuracy)]),
     ...P.p4.days.metrics.map((r) => ['Quiet day', r.model, fmt3(r.precision), fmt3(r.recall), fmt3(r.f1), '—', fmtPctOrDash(r.accuracy)]),
@@ -1156,17 +1492,30 @@ function renderPredictions() {
   document.getElementById('pr-p4-note').textContent =
     `High-value = order ≥ ${fmtUsdOrDash(P.p4.orders.cutoff)} (${P.p4.orders.n_pos_test} in the test set). ` +
     `Quiet day = fewer than ${fmtIntOrDash(P.p4.days.cutoff)} events (${P.p4.days.n_pos_test} of the 14 test days). ` +
-    'With so few positives, one right or wrong case moves recall a lot.';
+    'Quiet days are easy to spot; high-value orders are not. With so few cases, one right or wrong call moves recall a lot.';
+  renderQuietDays(P);
   const yn = (v) => (v ? 'Quiet' : '');
   renderTable(document.getElementById('pr-p4-flags'),
     [{ label: 'Date' }, { label: 'Day' }, num('Events'), { label: 'Actual' }, { label: 'Tree' }, { label: 'Logistic' }],
     P.p4.days.flags.map((r) => [r.date, r.weekday.slice(0, 3), fmtInt(r.events), yn(r.actual_quiet), yn(r.tree_flag), yn(r.logit_flag)]));
 
-  // ----- Overfitting
+  // ----- Overfitting: scores (0–1) as train vs test bars; errors stay in the table
+  const ov = P.overfit_summary || [];
+  const scores = ov.filter((r) => ['AUC', 'F1', 'Coverage'].includes(r.metric));
+  makeGroupedBar('pr-overfit-chart', scores.map((r) => [`${r.task} (${r.metric})`, r.model]), [
+    { label: 'Training', data: scores.map((r) => r.train), backgroundColor: PALETTE.chart4 },
+    { label: 'Test', data: scores.map((r) => r.test), backgroundColor: PALETTE.chart1 },
+  ], { horizontal: true, min: 0, max: 1, fmt: fmt2 });
+  const worst = scores.reduce((a, b) => (b['train − test'] > (a ? a['train − test'] : -Infinity) ? b : a), null);
+  if (worst) {
+    document.getElementById('pr-overfit-note').textContent =
+      `Biggest drop: ${worst.model} for ${worst.task.replace(/^#\d+ /, '').toLowerCase()} (${worst.metric} ${fmt2(worst.train)} → ${fmt2(worst.test)}), ` +
+      'so treat that model with caution. Most other models score about the same on both, which means they generalise.';
+  }
   const fmtOv = (metric, v) => (metric.startsWith('RMSE') ? fmtUsdOrDash(v) : metric.startsWith('MAE') ? fmtIntOrDash(v) : fmt3(v));
   renderTable(document.getElementById('pr-overfit'),
     [{ label: 'Task' }, { label: 'Model' }, { label: 'Metric' }, num('Train'), num('Test'), num('Train − test')],
-    (P.overfit_summary || []).map((r) => [r.task, r.model, r.metric, fmtOv(r.metric, r.train), fmtOv(r.metric, r.test),
+    ov.map((r) => [r.task, r.model, r.metric, fmtOv(r.metric, r.train), fmtOv(r.metric, r.test),
       fmtOv(r.metric, r['train − test'])]));
 }
 
@@ -1297,10 +1646,15 @@ async function init() {
   setupDateControls();
 
   document.querySelectorAll('.nav-item').forEach((btn) => {
-    btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
+    btn.addEventListener('click', () => {
+      switchPanel(btn.dataset.panel);
+      history.replaceState(null, '', '#' + btn.dataset.panel);
+    });
   });
 
-  renderCurrentPanel();
+  // a link like index.html#predictions opens that panel directly
+  const fromHash = location.hash.slice(1);
+  if (RENDERERS[fromHash]) switchPanel(fromHash); else renderCurrentPanel();
 }
 
 init();

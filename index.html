@@ -300,7 +300,15 @@
           <div class="card" style="margin-bottom:14px;">
             <span class="stat-tag">#2 Central tendency · #3 Dispersion</span>
             <p class="card-title">Daily events: Holt-Winters forecast with 80% range</p>
-            <p class="card-sub">Actual events for all 92 days, the forecast for the 14 test days (Jan 18–31) next to the seasonal-naive baseline, and the forecast for the next two weeks (Feb 1–14).</p>
+            <div id="pr-forecast-tabs" class="chart-tabs wrap" role="tablist">
+              <button class="chart-tab active" data-mode="all">All</button>
+              <button class="chart-tab" data-mode="actual">Actual</button>
+              <button class="chart-tab" data-mode="range">80% range</button>
+              <button class="chart-tab" data-mode="hw">Holt-Winters (test)</button>
+              <button class="chart-tab" data-mode="naive">Seasonal naive (baseline)</button>
+              <button class="chart-tab" data-mode="future">Forecast Feb 1–14</button>
+            </div>
+            <p class="insight" id="pr-forecast-caption" style="margin:0 0 10px;"></p>
             <canvas id="pr-forecast" height="110"></canvas>
           </div>
 
@@ -308,31 +316,44 @@
             <div class="card">
               <span class="stat-tag">#1 Frequency</span>
               <p class="card-title">Who will buy? Model comparison</p>
-              <p class="card-sub">Visitor-level classification. Recall and AUC are the main metrics; accuracy is shown only to compare with the baseline.</p>
-              <table class="data-table" id="pr-p1-metrics"></table>
+              <p class="card-sub">Taller is better on all four scores (0 = useless, 1 = perfect). Accuracy is left out because the baseline wins it just by saying “nobody buys”.</p>
+              <canvas id="pr-p1-chart" height="160"></canvas>
               <p class="insight" id="pr-p1-note"></p>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p1-metrics"></table>
+              </details>
             </div>
             <div class="card">
               <span class="stat-tag">#1 Frequency</span>
-              <p class="card-title">Top odds ratios (logistic regression)</p>
-              <p class="card-sub">Above 1 raises the odds of buying; below 1 lowers them. Counts are per extra event; categories are compared with the reference category.</p>
-              <table class="data-table" id="pr-p1-odds"></table>
+              <p class="card-title">What makes a visitor more likely to buy?</p>
+              <p class="card-sub">Odds ratios from the logistic regression. Bars going right raise the odds of buying (×2 = twice the odds); bars going left lower them. Counts are per extra event; categories are compared with the reference category.</p>
+              <canvas id="pr-p1-odds-chart" height="190"></canvas>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p1-odds"></table>
+              </details>
             </div>
           </div>
 
           <div class="grid cols-2">
             <div class="card">
               <span class="stat-tag">#2 Central tendency</span>
-              <p class="card-title">Order value and daily traffic accuracy</p>
-              <p class="card-sub">Test-set errors. MAE is the average miss; RMSE weighs large misses more; R² is the share of variation explained.</p>
-              <table class="data-table" id="pr-p2-orders"></table>
-              <div style="height:12px;"></div>
-              <table class="data-table" id="pr-p2-traffic"></table>
+              <p class="card-title">How far off are the predictions?</p>
+              <p class="card-sub">Average miss (MAE) on the test set. Shorter is better; grey is the simple baseline the model has to beat.</p>
+              <p class="mini-title">Order value ($ per order)</p>
+              <canvas id="pr-p2-orders-chart" height="55"></canvas>
+              <p class="mini-title">Daily traffic (events per day)</p>
+              <canvas id="pr-p2-traffic-chart" height="55"></canvas>
+              <p class="insight" id="pr-p2-note"></p>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p2-orders"></table>
+                <div style="height:12px;"></div>
+                <table class="data-table" id="pr-p2-traffic"></table>
+              </details>
             </div>
             <div class="card">
               <span class="stat-tag">#2 Central tendency</span>
               <p class="card-title">Weekly pattern learned by Holt-Winters</p>
-              <p class="card-sub">Events above or below an average day for each weekday.</p>
+              <p class="card-sub">Events above or below an average day for each weekday. Weekdays run busy; weekends drop sharply.</p>
               <canvas id="pr-weekday" height="160"></canvas>
             </div>
           </div>
@@ -341,31 +362,61 @@
             <div class="card">
               <span class="stat-tag">#3 Dispersion</span>
               <p class="card-title">How trustworthy are the ranges?</p>
-              <p class="card-sub">Coverage is the share of actual test values inside the predicted range; an 80% range should cover about 80%. Narrower is more useful at similar coverage.</p>
-              <table class="data-table" id="pr-p3"></table>
+              <p class="card-sub">Coverage = share of real test values that landed inside the predicted range. An 80% range should hit the dashed line; narrower ranges are more useful at similar coverage.</p>
+              <canvas id="pr-p3-chart" height="150"></canvas>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p3"></table>
+              </details>
             </div>
             <div class="card">
-              <span class="stat-tag">#4 Position</span>
-              <p class="card-title">High-value orders and quiet days</p>
-              <p class="card-sub">Decision tree vs. logistic regression. Recall is the main metric. Cut-offs come from the training data only.</p>
-              <table class="data-table" id="pr-p4"></table>
-              <p class="insight" id="pr-p4-note"></p>
+              <span class="stat-tag">#3 Dispersion</span>
+              <p class="card-title">Predicted range for each test order</p>
+              <p class="card-sub">Each bar is the quantile-regression range (P10–P90) for one test order; the dot is what the customer actually spent. Orders are sorted by actual value.</p>
+              <canvas id="pr-p3-ranges" height="170"></canvas>
+              <p class="insight" id="pr-p3-note"></p>
             </div>
           </div>
 
           <div class="grid cols-2">
             <div class="card">
               <span class="stat-tag">#4 Position</span>
-              <p class="card-title">Quiet-day flags for the test period</p>
-              <p class="card-sub">Each test day, whether it was actually quiet, and whether each model flagged it.</p>
-              <table class="data-table" id="pr-p4-flags"></table>
+              <p class="card-title">High-value orders and quiet days</p>
+              <p class="card-sub">Decision tree vs. logistic regression. Recall (share of real cases caught) is the main score. The baseline scores 0 on all three, so it is not drawn.</p>
+              <p class="mini-title">High-value orders</p>
+              <canvas id="pr-p4-orders-chart" height="110"></canvas>
+              <p class="mini-title">Quiet days</p>
+              <canvas id="pr-p4-days-chart" height="110"></canvas>
+              <p class="insight" id="pr-p4-note"></p>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p4"></table>
+              </details>
             </div>
             <div class="card">
-              <span class="stat-tag">Overfitting</span>
-              <p class="card-title">Training vs. test scores</p>
-              <p class="card-sub">For scores (AUC, F1, coverage) a large positive train − test gap is the warning sign; for errors (RMSE, MAE) a large negative gap is.</p>
-              <table class="data-table" id="pr-overfit"></table>
+              <span class="stat-tag">#4 Position</span>
+              <p class="card-title">Quiet-day flags for the test period</p>
+              <p class="card-sub">Events on each test day against the quiet-day cut-off, then what each model flagged.</p>
+              <canvas id="pr-p4-days-bars" height="130"></canvas>
+              <div class="flag-grid" id="pr-p4-flag-grid"></div>
+              <div class="flag-legend">
+                <span><i class="flag-cell hit">✓</i> caught a quiet day</span>
+                <span><i class="flag-cell false">!</i> false alarm</span>
+                <span><i class="flag-cell miss">✗</i> missed a quiet day</span>
+              </div>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p4-flags"></table>
+              </details>
             </div>
+          </div>
+
+          <div class="card">
+            <span class="stat-tag">Overfitting</span>
+            <p class="card-title">Training vs. test scores</p>
+            <p class="card-sub">If the test bar is much shorter than the training bar, the model memorised the training data instead of learning a pattern that carries over. Error metrics (RMSE, MAE) are in the table.</p>
+            <canvas id="pr-overfit-chart" height="85"></canvas>
+            <p class="insight" id="pr-overfit-note"></p>
+            <details class="table-toggle"><summary>Show exact numbers</summary>
+              <table class="data-table" id="pr-overfit"></table>
+            </details>
           </div>
         </div>
       </section>
