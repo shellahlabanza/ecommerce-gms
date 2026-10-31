@@ -28,6 +28,7 @@ function readPalette() {
   PALETTE.border = get('--border');
   PALETTE.fg = get('--foreground');
   PALETTE.destructive = get('--destructive');
+  PALETTE.card = get('--card');
   PALETTE.series = [PALETTE.chart1, PALETTE.chart3, PALETTE.chart4, PALETTE.chart2, PALETTE.chart5];
 }
 
@@ -170,6 +171,7 @@ function killChart(id) {
 
 function makeLine(id, labels, datasets, opts = {}) {
   killChart(id);
+  const { inlinePlugins = [], ...rest } = opts;
   const ctx = document.getElementById(id).getContext('2d');
   state.charts[id] = new Chart(ctx, {
     type: 'line',
@@ -182,8 +184,9 @@ function makeLine(id, labels, datasets, opts = {}) {
         x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
         y: { grid: { color: PALETTE.border }, beginAtZero: true },
       },
-      ...opts,
+      ...rest,
     },
+    plugins: inlinePlugins,
   });
 }
 
@@ -1073,7 +1076,7 @@ function prettyFeature(f) {
 }
 
 // Dashed reference line (target / cut-off) across the plot on the given value axis.
-function refLinePlugin(value, text, axisId) {
+function refLinePlugin(value, text, axisId, opts = {}) {
   return {
     id: 'refLine',
     afterDatasetsDraw(chart) {
@@ -1093,10 +1096,85 @@ function refLinePlugin(value, text, axisId) {
       if (scale.isHorizontal()) {
         ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         ctx.fillText(text, p + 4, a.top + 2);
+      } else if (opts.left) {
+        // left end, just under the line, on a background chip so bar labels stay readable
+        ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        const w = ctx.measureText(text).width;
+        ctx.fillStyle = PALETTE.card || '#fff';
+        ctx.fillRect(a.left + 2, p + 2, w + 6, 15);
+        ctx.fillStyle = PALETTE.fg;
+        ctx.fillText(text, a.left + 5, p + 4);
       } else {
         ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
         ctx.fillText(text, a.right, p - 3);
       }
+      ctx.restore();
+    },
+  };
+}
+
+// Value label on every (non-empty) bar of every visible dataset.
+function groupedBarLabelPlugin(fmt, horizontal) {
+  return {
+    id: 'groupedBarLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = `600 10.5px ${Chart.defaults.font.family}`;
+      ctx.fillStyle = PALETTE.fg;
+      chart.data.datasets.forEach((ds, di) => {
+        if (!chart.isDatasetVisible(di)) return;
+        chart.getDatasetMeta(di).data.forEach((bar, i) => {
+          const v = ds.data[i];
+          if (v == null) return;
+          if (horizontal) {
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.fillText(fmt(v), bar.x + 4, bar.y);
+          } else {
+            ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+            ctx.fillText(fmt(v), bar.x, bar.y - 3);
+          }
+        });
+      });
+      ctx.restore();
+    },
+  };
+}
+
+// Value labels on chosen points of line datasets. Each spec: { label, only?(i), pos?(i) -> 'above'|'below' }.
+// By default a label sits on the outer side of the curve: above peaks, below dips.
+function pointLabelPlugin(specs) {
+  return {
+    id: 'pointLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx, chartArea: a } = chart;
+      const xs = chart.scales.x;
+      ctx.save();
+      ctx.font = `600 10px ${Chart.defaults.font.family}`;
+      ctx.textBaseline = 'middle';
+      specs.forEach((spec) => {
+        const di = chart.data.datasets.findIndex((d) => d.label === spec.label);
+        if (di < 0 || !chart.isDatasetVisible(di)) return;
+        const data = chart.data.datasets[di].data;
+        chart.getDatasetMeta(di).data.forEach((pt, i) => {
+          const v = data[i];
+          if (v == null || i < xs.min || i > xs.max) return;
+          if (spec.only && !spec.only(i)) return;
+          const prev = data[i - 1] ?? v, next = data[i + 1] ?? v;
+          const above = spec.pos ? spec.pos(i) === 'above' : v >= (prev + next) / 2;
+          const text = fmtInt(Math.round(v));
+          const w = ctx.measureText(text).width;
+          const x = Math.min(Math.max(pt.x, a.left + w / 2 + 2), a.right - w / 2 - 2);
+          const y = pt.y + (above ? -11 : 11);
+          ctx.fillStyle = PALETTE.card || '#fff';
+          ctx.globalAlpha = 0.85;
+          ctx.fillRect(x - w / 2 - 2, y - 7, w + 4, 14);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = PALETTE.fg;
+          ctx.textAlign = 'center';
+          ctx.fillText(text, x, y);
+        });
+      });
       ctx.restore();
     },
   };
@@ -1122,6 +1200,8 @@ function makeGroupedBar(id, labels, sets, opts = {}) {
     options: {
       indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
+      // room for the value labels past the end of the bars
+      layout: { padding: horizontal ? { right: 36 } : { top: 16 } },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: sets.length > 1, position: 'top', align: 'start' },
@@ -1132,7 +1212,7 @@ function makeGroupedBar(id, labels, sets, opts = {}) {
       },
       scales: horizontal ? { x: valueAxis, y: catAxis } : { x: catAxis, y: valueAxis },
     },
-    plugins: opts.plugins || [],
+    plugins: [groupedBarLabelPlugin(fmt, horizontal), ...(opts.plugins || [])],
   });
 }
 
@@ -1181,30 +1261,36 @@ function renderForecast(P) {
     all: {
       sets: () => [S.actual(), ...S.testBand('80% range'), S.hw(), S.naive(), ...S.futureBand('_future_upper'), S.future()],
       from: 0, to: last,
+      labels: [{ label: 'Actual', only: (i) => i === iMax || i === iMin, pos: (i) => (i === iMax ? 'above' : 'below') }],
       caption: 'Every line together. Pick a tab above to see one line at a time.',
     },
     actual: {
       sets: () => [S.actual()], from: 0, to: nHist - 1,
+      labels: [{ label: 'Actual', only: (i) => i === iMax || i === iMin, pos: (i) => (i === iMax ? 'above' : 'below') }],
       caption: `Real events per day, ${shortDate(F.history_dates[0])} – ${shortDate(F.history_dates[nHist - 1])}. Weekdays are busier than weekends. ` +
         `Busiest day: ${shortDate(F.history_dates[iMax])} (${fmtInt(ev[iMax])}); quietest: ${shortDate(F.history_dates[iMin])} (${fmtInt(ev[iMin])}).`,
     },
     range: {
       sets: () => [S.actualGrey(), ...S.testBand('80% range'), ...S.futureBand('_future_upper')], from: zoomFrom, to: last,
+      labels: [{ label: 'Actual', only: (i) => i >= testStart && i < testStart + F.test_dates.length }],
       caption: `The shaded band is where the model expects about 80% of days to land. ${inside} of ${testActual.length} test days ` +
         `(${fmtPct0(inside / testActual.length)}) fell inside it. Grey is the actual traffic.`,
     },
     hw: {
       sets: () => [S.actualGrey(), S.hw()], from: zoomFrom, to: nHist - 1,
+      labels: [{ label: 'Holt-Winters (test)' }],
       caption: `The model's guess for each test day (${shortDate(F.test_dates[0])} – ${shortDate(F.test_dates[F.test_dates.length - 1])}) next to what really happened (grey). ` +
         `On average it was off by ${hwMae} events a day.`,
     },
     naive: {
       sets: () => [S.actualGrey(), S.naive()], from: zoomFrom, to: nHist - 1,
+      labels: [{ label: 'Seasonal naive (baseline)' }],
       caption: `The baseline just repeats the same weekday from the week before. It was off by ${naiveMae} events a day, ` +
         `so Holt-Winters (${hwMae}) is only slightly better.`,
     },
     future: {
       sets: () => [S.actualGrey(), ...S.futureBand('80% range'), S.future()], from: zoomFrom, to: last,
+      labels: [{ label: 'Forecast Feb 1–14' }],
       caption: `The next two weeks, which have no real data yet. Busiest: ${weekdayOf(F.future_dates[fMax])}s (~${fmtInt(Math.round(ff[fMax]))}); ` +
         `quietest: ${weekdayOf(F.future_dates[fMin])}s (~${fmtInt(Math.round(ff[fMin]))}). The band widens day by day because the further ahead the model looks, the less sure it is.`,
     },
@@ -1215,6 +1301,8 @@ function renderForecast(P) {
     const sets = mode.sets();
     document.getElementById('pr-forecast-caption').textContent = mode.caption;
     makeLine('pr-forecast', labels.map((d) => shortDate(d)), sets, {
+      inlinePlugins: [pointLabelPlugin(mode.labels || [])],
+      layout: { padding: { top: 16 } },
       plugins: {
         legend: { display: sets.filter((s) => !s.label.startsWith('_')).length > 1, labels: { filter: (item) => !item.text.startsWith('_') } },
         tooltip: {
@@ -1318,6 +1406,29 @@ function renderOrderRanges(P) {
     type: 'line', label, data, showLine: false, pointStyle: style, pointRadius: style === 'rectRot' ? 6 : 4.5, pointHoverRadius: 7,
     pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 1.5, borderColor: color, backgroundColor: color,
   });
+  // Actual value of each order, written vertically above its range bar.
+  const actualLabels = {
+    id: 'actualLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const ys = chart.scales.y;
+      ctx.save();
+      ctx.font = `600 10px ${Chart.defaults.font.family}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      chart.getDatasetMeta(2).data.forEach((bar, i) => {
+        const r = tr[i];
+        const top = Math.min(ys.getPixelForValue(r.actual), ys.getPixelForValue(r.P90)) - 8;
+        ctx.save();
+        ctx.translate(bar.x, top);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle = isIn(r) ? PALETTE.fg : PALETTE.destructive;
+        ctx.fillText('$' + Math.round(r.actual), 0, 0);
+        ctx.restore();
+      });
+      ctx.restore();
+    },
+  };
   state.charts['pr-p3-ranges'] = new Chart(document.getElementById('pr-p3-ranges').getContext('2d'), {
     type: 'bar',
     data: {
@@ -1331,6 +1442,7 @@ function renderOrderRanges(P) {
     },
     options: {
       responsive: true,
+      layout: { padding: { top: 34 } },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: true, position: 'top', align: 'start' },
@@ -1347,6 +1459,7 @@ function renderOrderRanges(P) {
         y: { beginAtZero: true, grid: { color: PALETTE.border }, border: { display: false }, ticks: { callback: (v) => '$' + v } },
       },
     },
+    plugins: [actualLabels],
   });
   const small = outs.filter((r) => r.actual < r.P10).length;
   document.getElementById('pr-p3-note').textContent =
@@ -1362,7 +1475,7 @@ function renderQuietDays(P) {
   makeGroupedBar('pr-p4-days-bars', labels, [
     { label: 'Quiet day', data: D.flags.map((r) => (r.actual_quiet ? r.events : null)), backgroundColor: PALETTE.chart3, grouped: false },
     { label: 'Normal day', data: D.flags.map((r) => (r.actual_quiet ? null : r.events)), backgroundColor: PALETTE.border, grouped: false },
-  ], { fmt: fmtIntOrDash, plugins: [refLinePlugin(D.cutoff, `Cut-off ${fmtInt(D.cutoff)}`, 'y')] });
+  ], { fmt: fmtIntOrDash, plugins: [refLinePlugin(D.cutoff, `Cut-off ${fmtInt(D.cutoff)}`, 'y', { left: true })] });
 
   const cell = (flag, actual) => {
     const kind = flag && actual ? 'hit' : flag ? 'false' : actual ? 'miss' : 'none';
