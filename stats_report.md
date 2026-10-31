@@ -1,8 +1,10 @@
 # Descriptive Statistics Report
 
-Generated: 2026-08-31T05:26:29
+Generated: 2026-10-31T19:01:17
 
 Rows: 100,000  |  Unique users: 42,610  |  Date range: 2020-11-01 to 2021-01-31
+
+Purchases: 133  |  With revenue: 123  |  Missing revenue (excluded from revenue stats): 10
 
 ## Frequency — top categories
 
@@ -48,10 +50,10 @@ Rows: 100,000  |  Unique users: 42,610  |  Date range: 2020-11-01 to 2021-01-31
 
 ## Central tendency, dispersion & position — numeric fields
 
-**Purchase revenue (purchase events only, USD)**  (n=133)
-- Mean: 69.9  Median: 50.0  Mode: 50.0
-- Range: 545.0  Std dev: 72.53  Variance: 5260.92  IQR: 56.0
-- Min: 6.0  P25: 26.0  P50: 50.0  P75: 82.0  P90: 128.6  Max: 551.0
+**Purchase revenue (purchase events only, USD)**  (n=123)
+- Mean: 71.52  Median: 50.0  Mode: 24.0
+- Range: 545.0  Std dev: 75.21  Variance: 5657.04  IQR: 63.0
+- Min: 6.0  P25: 24.0  P50: 50.0  P75: 87.0  P90: 137.0  Max: 551.0
 
 **Items per purchase**  (n=133)
 - Mean: 3.8  Median: 2.0  Mode: 1.0

@@ -4,9 +4,13 @@ build_data.py
 Statistical processing layer for the GA4 Analytics Dashboard.
 
 What it does:
-1. Loads the raw event-level CSV (Google Analytics 4 / BigQuery export sample,
-   Google Merchandise Store).
-2. Cleans/normalizes fields used by the dashboard.
+1. Loads the cleaned event-level CSV (BigQuery_4M_100k_cleaned.csv, the
+   Google Analytics 4 / BigQuery export sample of the Google Merchandise Store).
+2. Normalizes the fields used by the dashboard. The CSV is already cleaned, so
+   this step only fills display placeholders. The 10 purchase events whose
+   revenue is missing (purchase_missing_revenue = True) are kept as orders but
+   left out of the revenue statistics, giving the same 123 orders used in the
+   Problem Statement.
 3. Computes descriptive statistics across the four families the dashboard is
    organized around:
        - Frequency   (counts / distributions of categorical fields)
@@ -21,17 +25,21 @@ What it does:
        stats_report.md    -> human-readable descriptive statistics report
 
 Run:
-    python3 build_data.py
+    python3 build_data.py                      # finds the cleaned CSV automatically
+    python3 build_data.py path/to/cleaned.csv  # or point to it explicitly
 """
 
 import json
-import math
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
-SRC = Path(__file__).parent / "source_data.csv"
+HERE = Path(__file__).parent
+CSV_NAME = "BigQuery_4M_100k_cleaned.csv"
+# Looked for in this folder first, then in the parent folder.
+SRC_CANDIDATES = [HERE / CSV_NAME, HERE.parent / CSV_NAME]
 OUT_JSON = Path(__file__).parent / "data.json"
 OUT_REPORT = Path(__file__).parent / "stats_report.md"
 
@@ -101,16 +109,35 @@ def full_stats_block(series: pd.Series) -> dict:
 # Load + clean
 # ---------------------------------------------------------------------------
 
-def load_clean():
-    df = pd.read_csv(SRC, low_memory=False)
+def find_source() -> Path:
+    if len(sys.argv) > 1:
+        return Path(sys.argv[1])
+    for p in SRC_CANDIDATES:
+        if p.exists():
+            return p
+    raise FileNotFoundError(
+        f"{CSV_NAME} not found. Put it in {HERE} or its parent folder, "
+        "or pass the path: python3 build_data.py path/to/file.csv")
+
+
+def load_clean(src: Path):
+    df = pd.read_csv(src, low_memory=False)
 
     for c in CATEGORICAL_COLS:
         df[c] = df[c].fillna("(not set)")
 
-    df["purchase_revenue"] = df["purchase_revenue"].fillna(0.0)
+    df["is_purchase_event"] = df["event_name"].eq("purchase")
+    # Revenue only exists on purchase events. Non-purchase events get 0 so daily
+    # totals add up; purchases with missing revenue stay NaN (excluded from stats).
+    df.loc[~df["is_purchase_event"], "purchase_revenue"] = 0.0
+    # The cleaned CSV fills the 10 missing revenues with the $50 median and flags
+    # them in purchase_missing_revenue. Undo that fill so the statistics use only
+    # real revenue (123 orders), matching the Problem Statement.
+    if "purchase_missing_revenue" in df.columns:
+        flag = df["purchase_missing_revenue"].astype(str).str.lower().eq("true")
+        df.loc[flag, "purchase_revenue"] = float("nan")
     df["total_item_quantity"] = df["total_item_quantity"].fillna(0)
     df["unique_items"] = df["unique_items"].fillna(0)
-    df["is_purchase_event"] = df["event_name"].eq("purchase")
     df["event_date"] = pd.to_datetime(df["event_date"]).dt.strftime("%Y-%m-%d")
 
     return df
@@ -126,6 +153,10 @@ def write_report(df: pd.DataFrame):
     lines.append(f"\nGenerated: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"\nRows: {len(df):,}  |  Unique users: {df['user_pseudo_id'].nunique():,}  "
                   f"|  Date range: {df['event_date'].min()} to {df['event_date'].max()}")
+    n_orders = int(df["is_purchase_event"].sum())
+    n_missing = int(df.loc[df["is_purchase_event"], "purchase_revenue"].isna().sum())
+    lines.append(f"\nPurchases: {n_orders}  |  With revenue: {n_orders - n_missing}  "
+                  f"|  Missing revenue (excluded from revenue stats): {n_missing}")
 
     lines.append("\n## Frequency — top categories\n")
     for c in ["event_name", "device_category", "operating_system", "browser",
@@ -142,8 +173,7 @@ def write_report(df: pd.DataFrame):
         ("total_item_quantity", "Items per purchase"),
         ("unique_items", "Unique SKUs per purchase"),
     ]:
-        s = df.loc[df["is_purchase_event"], col] if col == "purchase_revenue" or True else df[col]
-        s = df.loc[df["is_purchase_event"], col]
+        s = df.loc[df["is_purchase_event"], col]  # NaN revenue is dropped by the stats helpers
         stats = full_stats_block(s)
         lines.append(f"**{label}**  (n={stats['frequency_n']})")
         lines.append(f"- Mean: {stats['mean']}  Median: {stats['median']}  Mode: {stats['mode']}")
@@ -181,7 +211,8 @@ def build_payload(df: pd.DataFrame) -> dict:
     user_idx = {u: i for i, u in enumerate(users)}
     ucode = df["user_pseudo_id"].astype(str).map(user_idx).astype(int)
 
-    rev = df["purchase_revenue"].round(2)
+    # NaN (purchase with missing revenue) becomes JSON null; the dashboard skips it.
+    rev = df["purchase_revenue"].round(2).astype(object).where(df["purchase_revenue"].notna(), None)
     qty = df["total_item_quantity"].astype(int)
     items = df["unique_items"].astype(int)
 
@@ -228,7 +259,9 @@ def build_payload(df: pd.DataFrame) -> dict:
 
 
 def main():
-    df = load_clean()
+    src = find_source()
+    print(f"Reading {src}")
+    df = load_clean(src)
     write_report(df)
     payload = build_payload(df)
     OUT_JSON.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
