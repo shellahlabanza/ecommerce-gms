@@ -21,16 +21,21 @@
     </div>
 
     <ul class="nav" id="nav-list">
+      <li class="nav-section">Summary</li>
       <li><button class="nav-item active" data-panel="overview"><span class="nav-dot"></span>Overview</button></li>
       <li><button class="nav-item" data-panel="trends"><span class="nav-dot"></span>Summary &amp; Trends</button></li>
-      <li><button class="nav-item" data-panel="device"><span class="nav-dot"></span>Device Category</button></li>
+      <li class="nav-section">Audience</li>
       <li><button class="nav-item" data-panel="countries"><span class="nav-dot"></span>Countries</button></li>
+      <li><button class="nav-item" data-panel="device"><span class="nav-dot"></span>Device Category</button></li>
       <li><button class="nav-item" data-panel="os-browser"><span class="nav-dot"></span>OS &amp; Browser</button></li>
-      <li><button class="nav-item" data-panel="sources"><span class="nav-dot"></span>Top Traffic Sources</button></li>
+      <li class="nav-section">Customer Journey</li>
+      <li><button class="nav-item" data-panel="sources"><span class="nav-dot"></span>Traffic Sources</button></li>
       <li><button class="nav-item" data-panel="events"><span class="nav-dot"></span>Events</button></li>
       <li><button class="nav-item" data-panel="conversion"><span class="nav-dot"></span>Conversion</button></li>
       <li><button class="nav-item" data-panel="ecommerce"><span class="nav-dot"></span>eCommerce</button></li>
-      <li><button class="nav-item" data-panel="predictions"><span class="nav-dot"></span>Predictions</button></li>
+      <li class="nav-section">Forecasting</li>
+      <li><button class="nav-item" data-panel="forecasts"><span class="nav-dot"></span>Forecasts &amp; Insights</button></li>
+      <li><button class="nav-item" data-panel="model-accuracy"><span class="nav-dot"></span>Model Accuracy</button></li>
     </ul>
 
     <div class="sidebar-footer" id="sidebar-meta">Loading dataset…</div>
@@ -276,8 +281,8 @@
       </section>
 
       <!-- PREDICTIONS (results exported by GMS_Predictive_Models.ipynb) -->
-      <section class="panel" id="panel-predictions">
-        <div class="card" id="pr-missing" style="display:none;">
+      <section class="panel" id="panel-forecasts">
+        <div class="card pr-missing" style="display:none;">
           <p class="card-title">No model results yet</p>
           <p class="card-sub" style="margin-bottom:0;">
             Run <strong>GMS_Predictive_Models.ipynb</strong> in Google Colab (Runtime → Run all).
@@ -286,16 +291,8 @@
           </p>
         </div>
 
-        <div id="pr-content" style="display:none;">
-          <p class="insight" id="pr-meta" style="margin:0 0 14px;"></p>
-          <div class="kpi-row" id="pr-kpis"></div>
-
-          <div class="card" style="margin-bottom:14px;">
-            <span class="stat-tag">Model vs. baseline</span>
-            <p class="card-title">Every model against its baseline (test set)</p>
-            <p class="card-sub">A model is kept only if it beats its baseline. AUC and recall: higher is better. MAE and distance from 80% coverage: lower is better.</p>
-            <table class="data-table" id="pr-summary"></table>
-          </div>
+        <div class="pr-content" style="display:none;">
+          <p class="insight pr-meta" style="margin:0 0 14px;"></p>
 
           <div class="card" style="margin-bottom:14px;">
             <span class="stat-tag">#2 Central tendency · #3 Dispersion</span>
@@ -314,14 +311,10 @@
 
           <div class="grid cols-2">
             <div class="card">
-              <span class="stat-tag">#1 Frequency</span>
-              <p class="card-title">Who will buy? Model comparison</p>
-              <p class="card-sub">Taller is better on all four scores (0 = useless, 1 = perfect). Accuracy is left out because the baseline wins it just by saying “nobody buys”.</p>
-              <canvas id="pr-p1-chart" height="160"></canvas>
-              <p class="insight" id="pr-p1-note"></p>
-              <details class="table-toggle"><summary>Show exact numbers</summary>
-                <table class="data-table" id="pr-p1-metrics"></table>
-              </details>
+              <span class="stat-tag">#2 Central tendency</span>
+              <p class="card-title">Weekly pattern learned by Holt-Winters</p>
+              <p class="card-sub">Events above or below an average day for each weekday. Weekdays run busy; weekends drop sharply.</p>
+              <canvas id="pr-weekday" height="160"></canvas>
             </div>
             <div class="card">
               <span class="stat-tag">#1 Frequency</span>
@@ -335,6 +328,64 @@
           </div>
 
           <div class="grid cols-2">
+            <div class="card">
+              <span class="stat-tag">#3 Dispersion</span>
+              <p class="card-title">Predicted range for each test order</p>
+              <p class="card-sub">Each bar is the quantile-regression range (P10–P90) for one test order; the dot is what the customer actually spent. Orders are sorted by actual value.</p>
+              <canvas id="pr-p3-ranges" height="170"></canvas>
+              <p class="insight" id="pr-p3-note"></p>
+            </div>
+            <div class="card">
+              <span class="stat-tag">#4 Position</span>
+              <p class="card-title">Quiet-day flags for the test period</p>
+              <p class="card-sub">Events on each test day against the quiet-day cut-off, then what each model flagged.</p>
+              <canvas id="pr-p4-days-bars" height="130"></canvas>
+              <div class="flag-grid" id="pr-p4-flag-grid"></div>
+              <div class="flag-legend">
+                <span><i class="flag-cell hit">✓</i> caught a quiet day</span>
+                <span><i class="flag-cell false">!</i> false alarm</span>
+                <span><i class="flag-cell miss">✗</i> missed a quiet day</span>
+              </div>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p4-flags"></table>
+              </details>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-model-accuracy">
+        <div class="card pr-missing" style="display:none;">
+          <p class="card-title">No model results yet</p>
+          <p class="card-sub" style="margin-bottom:0;">
+            Run <strong>GMS_Predictive_Models.ipynb</strong> in Google Colab (Runtime → Run all).
+            It downloads <code>predictions.json</code>. Put that file in this folder, next to
+            <code>data.json</code>, and reload the page.
+          </p>
+        </div>
+
+        <div class="pr-content" style="display:none;">
+          <p class="insight pr-meta" style="margin:0 0 14px;"></p>
+          <div class="kpi-row" id="pr-kpis"></div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <span class="stat-tag">Model vs. baseline</span>
+            <p class="card-title">Every model against its baseline (test set)</p>
+            <p class="card-sub">A model is kept only if it beats its baseline. AUC and recall: higher is better. MAE and distance from 80% coverage: lower is better.</p>
+            <table class="data-table" id="pr-summary"></table>
+          </div>
+
+          <div class="grid cols-2">
+            <div class="card">
+              <span class="stat-tag">#1 Frequency</span>
+              <p class="card-title">Who will buy? Model comparison</p>
+              <p class="card-sub">Taller is better on all four scores (0 = useless, 1 = perfect). Accuracy is left out because the baseline wins it just by saying “nobody buys”.</p>
+              <canvas id="pr-p1-chart" height="160"></canvas>
+              <p class="insight" id="pr-p1-note"></p>
+              <details class="table-toggle"><summary>Show exact numbers</summary>
+                <table class="data-table" id="pr-p1-metrics"></table>
+              </details>
+            </div>
             <div class="card">
               <span class="stat-tag">#2 Central tendency</span>
               <p class="card-title">How far off are the predictions?</p>
@@ -350,12 +401,6 @@
                 <table class="data-table" id="pr-p2-traffic"></table>
               </details>
             </div>
-            <div class="card">
-              <span class="stat-tag">#2 Central tendency</span>
-              <p class="card-title">Weekly pattern learned by Holt-Winters</p>
-              <p class="card-sub">Events above or below an average day for each weekday. Weekdays run busy; weekends drop sharply.</p>
-              <canvas id="pr-weekday" height="160"></canvas>
-            </div>
           </div>
 
           <div class="grid cols-2">
@@ -369,16 +414,6 @@
               </details>
             </div>
             <div class="card">
-              <span class="stat-tag">#3 Dispersion</span>
-              <p class="card-title">Predicted range for each test order</p>
-              <p class="card-sub">Each bar is the quantile-regression range (P10–P90) for one test order; the dot is what the customer actually spent. Orders are sorted by actual value.</p>
-              <canvas id="pr-p3-ranges" height="170"></canvas>
-              <p class="insight" id="pr-p3-note"></p>
-            </div>
-          </div>
-
-          <div class="grid cols-2">
-            <div class="card">
               <span class="stat-tag">#4 Position</span>
               <p class="card-title">High-value orders and quiet days</p>
               <p class="card-sub">Decision tree vs. logistic regression. Recall (share of real cases caught) is the main score. The baseline scores 0 on all three, so it is not drawn.</p>
@@ -389,21 +424,6 @@
               <p class="insight" id="pr-p4-note"></p>
               <details class="table-toggle"><summary>Show exact numbers</summary>
                 <table class="data-table" id="pr-p4"></table>
-              </details>
-            </div>
-            <div class="card">
-              <span class="stat-tag">#4 Position</span>
-              <p class="card-title">Quiet-day flags for the test period</p>
-              <p class="card-sub">Events on each test day against the quiet-day cut-off, then what each model flagged.</p>
-              <canvas id="pr-p4-days-bars" height="130"></canvas>
-              <div class="flag-grid" id="pr-p4-flag-grid"></div>
-              <div class="flag-legend">
-                <span><i class="flag-cell hit">✓</i> caught a quiet day</span>
-                <span><i class="flag-cell false">!</i> false alarm</span>
-                <span><i class="flag-cell miss">✗</i> missed a quiet day</span>
-              </div>
-              <details class="table-toggle"><summary>Show exact numbers</summary>
-                <table class="data-table" id="pr-p4-flags"></table>
               </details>
             </div>
           </div>

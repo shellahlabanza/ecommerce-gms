@@ -1491,17 +1491,51 @@ function renderQuietDays(P) {
     row('Logistic', D.flags.map((r) => cell(r.logit_flag, r.actual_quiet)).join(''));
 }
 
-function renderPredictions() {
+// Shows the "no results" card or the content on a Forecasting panel; returns predictions.json or null.
+function preparePredictionPanel(panelId) {
   const P = state.predictions;
-  document.getElementById('pr-missing').style.display = P ? 'none' : '';
-  document.getElementById('pr-content').style.display = P ? '' : 'none';
-  if (!P) return;
+  const panel = document.getElementById(panelId);
+  panel.querySelector('.pr-missing').style.display = P ? 'none' : '';
+  panel.querySelector('.pr-content').style.display = P ? '' : 'none';
+  if (!P) return null;
 
   const m = P.meta || {};
-  document.getElementById('pr-meta').textContent =
+  panel.querySelector('.pr-meta').textContent =
     `Results from ${m.source_csv || 'the notebook'} (generated ${m.generated_at || '—'}). ` +
     `Time-based split: training ${m.train_days ? m.train_days.join(' → ') : '—'}, ` +
     `test ${m.test_days ? m.test_days.join(' → ') : '—'}. The date filter above does not apply to this panel.`;
+  return P;
+}
+
+// Forecasting → Forecasts & Insights: what the models predict
+function renderForecasts() {
+  const P = preparePredictionPanel('panel-forecasts');
+  if (!P) return;
+
+  renderForecast(P);
+
+  const wk = P.p2.traffic.weekday_effects || [];
+  makeBar('pr-weekday', wk.map((r) => r.weekday.slice(0, 3)), wk.map((r) => Math.round(r.effect_vs_average_day)),
+    { color: wk.map((r) => (r.effect_vs_average_day >= 0 ? PALETTE.chart1 : PALETTE.chart4)), fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v) });
+
+  renderOdds(P);
+  renderTable(document.getElementById('pr-p1-odds'),
+    [{ label: 'Feature' }, num('Odds ratio')],
+    P.p1.odds_ratios.map((r) => [prettyFeature(r.feature), fmt2(r.odds_ratio)]));
+
+  renderOrderRanges(P);
+
+  renderQuietDays(P);
+  const yn = (v) => (v ? 'Quiet' : '');
+  renderTable(document.getElementById('pr-p4-flags'),
+    [{ label: 'Date' }, { label: 'Day' }, num('Events'), { label: 'Actual' }, { label: 'Tree' }, { label: 'Logistic' }],
+    P.p4.days.flags.map((r) => [r.date, r.weekday.slice(0, 3), fmtInt(r.events), yn(r.actual_quiet), yn(r.tree_flag), yn(r.logit_flag)]));
+}
+
+// Forecasting → Model Accuracy: how well each model did against its baseline
+function renderModelAccuracy() {
+  const P = preparePredictionPanel('panel-model-accuracy');
+  if (!P) return;
 
   // ----- KPIs
   const summary = P.summary || [];
@@ -1535,9 +1569,6 @@ function renderPredictions() {
     summary.map((r) => [r.problem, r.task, r.model, r.metric, fmtMetric(r.metric, r.model_value),
       fmtMetric(r.metric, r.baseline_value), r.beats_baseline ? '✓ Yes' : '✗ No']));
 
-  // ----- Forecast (sub-tabs)
-  renderForecast(P);
-
   // ----- Problem #1
   makeGroupedBar('pr-p1-chart', ['Precision', 'Recall', 'F1', 'AUC'],
     P.p1.metrics.map((r) => ({ label: r.model, data: [r.precision, r.recall, r.f1, r.auc], backgroundColor: modelColor(r.model) })),
@@ -1549,10 +1580,6 @@ function renderPredictions() {
   renderTable(document.getElementById('pr-p1-metrics'),
     [{ label: 'Model' }, num('Accuracy'), num('Precision'), num('Recall'), num('F1'), num('AUC')],
     P.p1.metrics.map((r) => [r.model, fmtPctOrDash(r.accuracy), fmt3(r.precision), fmt3(r.recall), fmt3(r.f1), fmt3(r.auc)]));
-  renderOdds(P);
-  renderTable(document.getElementById('pr-p1-odds'),
-    [{ label: 'Feature' }, num('Odds ratio')],
-    P.p1.odds_ratios.map((r) => [prettyFeature(r.feature), fmt2(r.odds_ratio)]));
 
   // ----- Problem #2
   const om = P.p2.orders.metrics, tmx = P.p2.traffic.metrics;
@@ -1570,9 +1597,6 @@ function renderPredictions() {
   renderTable(document.getElementById('pr-p2-traffic'),
     [{ label: 'Daily traffic' }, num('MAE'), num('RMSE')],
     tmx.map((r) => [r.model, fmtIntOrDash(r.MAE), fmtIntOrDash(r.RMSE)]));
-  const wk = P.p2.traffic.weekday_effects || [];
-  makeBar('pr-weekday', wk.map((r) => r.weekday.slice(0, 3)), wk.map((r) => Math.round(r.effect_vs_average_day)),
-    { color: wk.map((r) => (r.effect_vs_average_day >= 0 ? PALETTE.chart1 : PALETTE.chart4)), fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v) });
 
   // ----- Problem #3
   const p3all = [
@@ -1589,7 +1613,6 @@ function renderPredictions() {
   renderTable(document.getElementById('pr-p3'),
     [{ label: 'Task' }, { label: 'Model' }, num('MAE (middle)'), num('Coverage'), num('Avg width')],
     p3all.map((x) => [x.task, x.r.model, x.mae, fmtPctOrDash(x.r.coverage), x.width]));
-  renderOrderRanges(P);
 
   // ----- Problem #4
   const p4Sets = (rows) => rows.filter((r) => !r.model.startsWith('Baseline'))
@@ -1606,11 +1629,6 @@ function renderPredictions() {
     `High-value = order ≥ ${fmtUsdOrDash(P.p4.orders.cutoff)} (${P.p4.orders.n_pos_test} in the test set). ` +
     `Quiet day = fewer than ${fmtIntOrDash(P.p4.days.cutoff)} events (${P.p4.days.n_pos_test} of the 14 test days). ` +
     'Quiet days are easy to spot; high-value orders are not. With so few cases, one right or wrong call moves recall a lot.';
-  renderQuietDays(P);
-  const yn = (v) => (v ? 'Quiet' : '');
-  renderTable(document.getElementById('pr-p4-flags'),
-    [{ label: 'Date' }, { label: 'Day' }, num('Events'), { label: 'Actual' }, { label: 'Tree' }, { label: 'Logistic' }],
-    P.p4.days.flags.map((r) => [r.date, r.weekday.slice(0, 3), fmtInt(r.events), yn(r.actual_quiet), yn(r.tree_flag), yn(r.logit_flag)]));
 
   // ----- Overfitting: scores (0–1) as train vs test bars; errors stay in the table
   const ov = P.overfit_summary || [];
@@ -1642,7 +1660,8 @@ const RENDERERS = {
   events: renderEvents,
   conversion: renderConversion,
   ecommerce: renderEcommerce,
-  predictions: renderPredictions,
+  forecasts: renderForecasts,
+  'model-accuracy': renderModelAccuracy,
 };
 
 const TITLES = {
@@ -1651,11 +1670,12 @@ const TITLES = {
   device: ['Device Category', 'Desktop, mobile, and tablet usage.'],
   countries: ['Countries', 'Where events originate, by country and continent.'],
   'os-browser': ['Operating System & Browser', 'Technology breakdown of visiting devices.'],
-  sources: ['Top Traffic Sources', 'Acquisition channels, sources, and mediums.'],
+  sources: ['Traffic Sources', 'Acquisition channels, sources, and mediums.'],
   events: ['Events', 'Frequency of every tracked GA4 event.'],
   conversion: ['Conversion', 'Funnel from session start through purchase.'],
   ecommerce: ['eCommerce', 'Revenue and order statistics.'],
-  predictions: ['Predictions', 'Model evaluation for Problems #1–#4, exported from the Colab notebook.'],
+  forecasts: ['Forecasts & Insights', 'What the models predict for traffic, buyers, and orders (Problems #1–#4).'],
+  'model-accuracy': ['Model Accuracy', 'How each model scores against its baseline, and whether it overfits.'],
 };
 
 let currentPanel = 'overview';
@@ -1744,7 +1764,7 @@ async function init() {
   readPalette();
   try {
     await loadData();
-    await loadPredictions();   // optional: the panel explains what to do if it is missing
+    await loadPredictions();   // optional: the Forecasting panels explain what to do if it is missing
   } catch (err) {
     document.getElementById('loading-msg').textContent = err.message;
     return;
@@ -1765,8 +1785,8 @@ async function init() {
     });
   });
 
-  // a link like index.html#predictions opens that panel directly
-  const fromHash = location.hash.slice(1);
+  // a link like index.html#forecasts opens that panel directly (#predictions is the old name)
+  const fromHash = location.hash.slice(1) === 'predictions' ? 'forecasts' : location.hash.slice(1);
   if (RENDERERS[fromHash]) switchPanel(fromHash); else renderCurrentPanel();
 }
 
