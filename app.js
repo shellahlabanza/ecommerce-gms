@@ -6,6 +6,7 @@
 
 const state = {
   data: null,
+  predictions: null, // predictions.json from the Colab notebook (optional)
   colIdx: {},
   charts: {},     // canvas id -> Chart.js instance
   startDay: 0,
@@ -438,7 +439,7 @@ function renderOverview(rows) {
   const sessions = countWhere(rows, 'event_name', 'session_start');
   const purchases = countWhere(rows, 'event_name', 'purchase');
   const revIdx = state.colIdx.revenue;
-  const revenue = rows.reduce((a, r) => a + r[revIdx], 0);
+  const revenue = rows.reduce((a, r) => a + (r[revIdx] || 0), 0);
   const users = uniqueUserCount(rows);
   const convRate = sessions > 0 ? purchases / sessions : 0;
 
@@ -922,13 +923,15 @@ function renderEcommerce(rows) {
   const purchaseRows = rows.filter((r) => r[enIdx] === purchaseCode);
   const revIdx = state.colIdx.revenue, qtyIdx = state.colIdx.qty, itemsIdx = state.colIdx.items;
 
-  const revenues = purchaseRows.map((r) => r[revIdx]);
+  // Purchases whose revenue is missing are null in data.json: they count as
+  // orders but are left out of every revenue statistic.
+  const revenues = purchaseRows.map((r) => r[revIdx]).filter((v) => v !== null && v !== undefined);
   const totalRevenue = revenues.reduce((a, b) => a + b, 0);
   const stats = describe(revenues);
   const qtyStats = describe(purchaseRows.map((r) => r[qtyIdx]));
 
   document.getElementById('ec-kpis').innerHTML = [
-    ['Total revenue', fmtUsd(totalRevenue), `${fmtInt(purchaseRows.length)} orders`],
+    ['Total revenue', fmtUsd(totalRevenue), `${fmtInt(purchaseRows.length)} orders · ${fmtInt(revenues.length)} with revenue`],
     ['Avg order value', stats.mean ? fmtUsd(stats.mean) : '—', 'Mean purchase revenue'],
     ['Median order value', stats.median ? fmtUsd(stats.median) : '—', 'Middle value'],
     ['Avg items / order', qtyStats.mean ? qtyStats.mean.toFixed(1) : '—', 'Mean item quantity'],
@@ -941,7 +944,7 @@ function renderEcommerce(rows) {
 
   const dayIdx = state.colIdx.day;
   const revByDay = new Map();
-  for (const r of purchaseRows) revByDay.set(r[dayIdx], (revByDay.get(r[dayIdx]) || 0) + r[revIdx]);
+  for (const r of purchaseRows) revByDay.set(r[dayIdx], (revByDay.get(r[dayIdx]) || 0) + (r[revIdx] || 0));
   const days = [];
   for (let d = state.startDay; d <= state.endDay; d++) days.push({ day: d, rev: revByDay.get(d) || 0 });
   const dayVals = days.map((d) => d.rev);
@@ -970,7 +973,7 @@ function renderEcommerce(rows) {
   const revByDevice = new Map();
   for (const r of purchaseRows) {
     const label = lookup('device_category', r[devIdx]);
-    revByDevice.set(label, (revByDevice.get(label) || 0) + r[revIdx]);
+    revByDevice.set(label, (revByDevice.get(label) || 0) + (r[revIdx] || 0));
   }
   const deviceEntries = [...revByDevice.entries()].sort((a, b) => b[1] - a[1]);
   makeBar('ec-device', deviceEntries.map((e) => e[0]), deviceEntries.map((e) => e[1]), { total: totalRevenue, fmt: fmtUsd, color: PALETTE.chart4 });
@@ -1019,6 +1022,154 @@ function skewNote(stats) {
   return `${skewTxt} Roughly symmetric: the mean (${fmtUsd(stats.mean)}) and median (${fmtUsd(stats.median)}) are close, so either describes a typical order.`;
 }
 
+/* ---------------------------------------------------------------------
+   Predictions panel
+   Reads predictions.json, the file exported by GMS_Predictive_Models.ipynb
+   (Google Colab). The panel shows the model evaluation for Problems #1–#4.
+   It does not depend on the date range: the models were trained and tested
+   on fixed periods (see the notebook).
+   --------------------------------------------------------------------- */
+
+async function loadPredictions() {
+  try {
+    const res = await fetch('predictions.json', { cache: 'no-store' });
+    state.predictions = res.ok ? await res.json() : null;
+  } catch (err) {
+    state.predictions = null;
+  }
+}
+
+const fmt2 = (v) => (v == null ? '—' : Number(v).toFixed(2));
+const fmt3 = (v) => (v == null ? '—' : Number(v).toFixed(3));
+const fmtPctOrDash = (v) => (v == null ? '—' : fmtPct(v));
+const fmtUsdOrDash = (v) => (v == null ? '—' : '$' + Number(v).toFixed(2));
+const fmtIntOrDash = (v) => (v == null ? '—' : fmtInt(Math.round(v)));
+const num = (label) => ({ label, num: true });
+
+function renderPredictions() {
+  const P = state.predictions;
+  document.getElementById('pr-missing').style.display = P ? 'none' : '';
+  document.getElementById('pr-content').style.display = P ? '' : 'none';
+  if (!P) return;
+
+  const m = P.meta || {};
+  document.getElementById('pr-meta').textContent =
+    `Results from ${m.source_csv || 'the notebook'} (generated ${m.generated_at || '—'}). ` +
+    `Time-based split: training ${m.train_days ? m.train_days.join(' → ') : '—'}, ` +
+    `test ${m.test_days ? m.test_days.join(' → ') : '—'}. The date filter above does not apply to this panel.`;
+
+  // ----- KPIs
+  const summary = P.summary || [];
+  const kept = summary.filter((r) => r.beats_baseline).length;
+  const lr1 = (P.p1.metrics || []).find((r) => r.model === 'Logistic regression') || {};
+  const hw = (P.p2.traffic.metrics || []).find((r) => r.model === 'Holt-Winters') || {};
+  const hwBase = (P.p2.traffic.metrics || []).find((r) => r.model.startsWith('Baseline')) || {};
+  const cov = (P.p3.traffic.metrics || []).find((r) => r.model.startsWith('Holt-Winters')) || {};
+  document.getElementById('pr-kpis').innerHTML = [
+    ['Models beating baseline', `${kept} / ${summary.length}`, 'On each task’s main metric'],
+    ['Buyer model AUC', fmt3(lr1.auc), `Logistic regression · recall ${fmtPctOrDash(lr1.recall)}`],
+    ['Traffic forecast MAE', fmtIntOrDash(hw.MAE), `events/day · baseline ${fmtIntOrDash(hwBase.MAE)}`],
+    ['Forecast range coverage', fmtPctOrDash(cov.coverage), 'Target ≈ 80% of test days'],
+  ].map(([label, val, note]) => `
+    <div class="kpi-card">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${val}</div>
+      <div class="kpi-note">${note}</div>
+    </div>`).join('');
+
+  // ----- Summary table
+  const fmtMetric = (metric, v) => {
+    if (v == null) return '—';
+    if (metric.startsWith('MAE ($')) return fmtUsdOrDash(v);
+    if (metric.startsWith('MAE')) return fmtIntOrDash(v);
+    if (metric === 'Recall' || metric.startsWith('|coverage')) return fmtPct(v);
+    return fmt3(v);
+  };
+  renderTable(document.getElementById('pr-summary'),
+    [{ label: 'Problem' }, { label: 'Task' }, { label: 'Model' }, { label: 'Main metric' }, num('Model'), num('Baseline'), { label: 'Beats baseline?' }],
+    summary.map((r) => [r.problem, r.task, r.model, r.metric, fmtMetric(r.metric, r.model_value),
+      fmtMetric(r.metric, r.baseline_value), r.beats_baseline ? 'Yes' : 'No']));
+
+  // ----- Forecast chart
+  const F = P.forecast;
+  const labels = [...F.history_dates, ...F.future_dates];
+  const nHist = F.history_dates.length, nFut = F.future_dates.length;
+  const testStart = F.history_dates.indexOf(F.test_dates[0]);
+  const place = (arr, start) => labels.map((_, i) => (i >= start && i < start + arr.length ? arr[i - start] : null));
+  const band = 'rgba(42, 161, 179, 0.18)';
+  const line = (label, data, color, extra = {}) => ({ label, data, borderColor: color, backgroundColor: color,
+    pointRadius: 0, borderWidth: 2, tension: 0.25, spanGaps: false, fill: false, ...extra });
+  makeLine('pr-forecast', labels.map((d) => d.slice(5)), [
+    line('Actual', [...F.history_events, ...new Array(nFut).fill(null)], PALETTE.fg, { borderWidth: 1.5 }),
+    line('_test_lower', place(F.test_lower, testStart), 'transparent', { borderWidth: 0 }),
+    line('80% range', place(F.test_upper, testStart), 'transparent', { borderWidth: 0, fill: '-1', backgroundColor: band }),
+    line('Holt-Winters (test)', place(F.test_forecast, testStart), PALETTE.chart1),
+    line('Seasonal naive (baseline)', place(F.naive_forecast, testStart), PALETTE.chart4, { borderDash: [5, 4], borderWidth: 1.5 }),
+    line('_future_lower', place(F.future_lower, nHist), 'transparent', { borderWidth: 0 }),
+    line('_future_upper', place(F.future_upper, nHist), 'transparent', { borderWidth: 0, fill: '-1', backgroundColor: band }),
+    line('Forecast Feb 1–14', place(F.future_forecast, nHist), PALETTE.chart3, { borderDash: [6, 3] }),
+  ], {
+    plugins: {
+      legend: { display: true, labels: { filter: (item) => !item.text.startsWith('_') } },
+      tooltip: { filter: (item) => !item.dataset.label.startsWith('_') && item.raw != null,
+        callbacks: { label: (c) => `${c.dataset.label}: ${fmtInt(Math.round(c.raw))}` } },
+    },
+  });
+
+  // ----- Problem #1
+  renderTable(document.getElementById('pr-p1-metrics'),
+    [{ label: 'Model' }, num('Accuracy'), num('Precision'), num('Recall'), num('F1'), num('AUC')],
+    P.p1.metrics.map((r) => [r.model, fmtPctOrDash(r.accuracy), fmt3(r.precision), fmt3(r.recall), fmt3(r.f1), fmt3(r.auc)]));
+  document.getElementById('pr-p1-note').textContent =
+    `${fmtInt(P.p1.n_buyers)} buyers among ${fmtInt(P.p1.n_visitors)} visitors. ` +
+    `The top 1% of test visitors ranked by the model contain ${fmtPctOrDash(P.p1.share_buyers_top1pct)} of all test buyers.`;
+  renderTable(document.getElementById('pr-p1-odds'),
+    [{ label: 'Feature' }, num('Odds ratio')],
+    P.p1.odds_ratios.map((r) => [r.feature, fmt2(r.odds_ratio)]));
+
+  // ----- Problem #2
+  renderTable(document.getElementById('pr-p2-orders'),
+    [{ label: 'Order value' }, num('MAE'), num('RMSE'), num('R²')],
+    P.p2.orders.metrics.map((r) => [r.model, fmtUsdOrDash(r.MAE), fmtUsdOrDash(r.RMSE), fmt3(r.R2)]));
+  renderTable(document.getElementById('pr-p2-traffic'),
+    [{ label: 'Daily traffic' }, num('MAE'), num('RMSE')],
+    P.p2.traffic.metrics.map((r) => [r.model, fmtIntOrDash(r.MAE), fmtIntOrDash(r.RMSE)]));
+  const wk = P.p2.traffic.weekday_effects || [];
+  makeBar('pr-weekday', wk.map((r) => r.weekday.slice(0, 3)), wk.map((r) => Math.round(r.effect_vs_average_day)),
+    { color: PALETTE.chart2, fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v) });
+
+  // ----- Problem #3
+  const p3rows = [
+    ...P.p3.orders.metrics.map((r) => ['Order value', r.model, fmtUsdOrDash(r.MAE_P50), fmtPctOrDash(r.coverage), fmtUsdOrDash(r.avg_width)]),
+    ...P.p3.traffic.metrics.map((r) => ['Daily traffic', r.model, fmtIntOrDash(r.MAE), fmtPctOrDash(r.coverage), fmtIntOrDash(r.avg_width)]),
+  ];
+  renderTable(document.getElementById('pr-p3'),
+    [{ label: 'Task' }, { label: 'Model' }, num('MAE (middle)'), num('Coverage'), num('Avg width')], p3rows);
+
+  // ----- Problem #4
+  const p4rows = [
+    ...P.p4.orders.metrics.map((r) => ['High-value order', r.model, fmt3(r.precision), fmt3(r.recall), fmt3(r.f1), fmt3(r.auc), fmtPctOrDash(r.accuracy)]),
+    ...P.p4.days.metrics.map((r) => ['Quiet day', r.model, fmt3(r.precision), fmt3(r.recall), fmt3(r.f1), '—', fmtPctOrDash(r.accuracy)]),
+  ];
+  renderTable(document.getElementById('pr-p4'),
+    [{ label: 'Task' }, { label: 'Model' }, num('Precision'), num('Recall'), num('F1'), num('AUC'), num('Accuracy')], p4rows);
+  document.getElementById('pr-p4-note').textContent =
+    `High-value = order ≥ ${fmtUsdOrDash(P.p4.orders.cutoff)} (${P.p4.orders.n_pos_test} in the test set). ` +
+    `Quiet day = fewer than ${fmtIntOrDash(P.p4.days.cutoff)} events (${P.p4.days.n_pos_test} of the 14 test days). ` +
+    'With so few positives, one right or wrong case moves recall a lot.';
+  const yn = (v) => (v ? 'Quiet' : '');
+  renderTable(document.getElementById('pr-p4-flags'),
+    [{ label: 'Date' }, { label: 'Day' }, num('Events'), { label: 'Actual' }, { label: 'Tree' }, { label: 'Logistic' }],
+    P.p4.days.flags.map((r) => [r.date, r.weekday.slice(0, 3), fmtInt(r.events), yn(r.actual_quiet), yn(r.tree_flag), yn(r.logit_flag)]));
+
+  // ----- Overfitting
+  const fmtOv = (metric, v) => (metric.startsWith('RMSE') ? fmtUsdOrDash(v) : metric.startsWith('MAE') ? fmtIntOrDash(v) : fmt3(v));
+  renderTable(document.getElementById('pr-overfit'),
+    [{ label: 'Task' }, { label: 'Model' }, { label: 'Metric' }, num('Train'), num('Test'), num('Train − test')],
+    (P.overfit_summary || []).map((r) => [r.task, r.model, r.metric, fmtOv(r.metric, r.train), fmtOv(r.metric, r.test),
+      fmtOv(r.metric, r['train − test'])]));
+}
+
 const RENDERERS = {
   overview: renderOverview,
   trends: renderTrends,
@@ -1029,6 +1180,7 @@ const RENDERERS = {
   events: renderEvents,
   conversion: renderConversion,
   ecommerce: renderEcommerce,
+  predictions: renderPredictions,
 };
 
 const TITLES = {
@@ -1041,6 +1193,7 @@ const TITLES = {
   events: ['Events', 'Frequency of every tracked GA4 event.'],
   conversion: ['Conversion', 'Funnel from session start through purchase.'],
   ecommerce: ['eCommerce', 'Revenue and order statistics.'],
+  predictions: ['Predictions', 'Model evaluation for Problems #1–#4, exported from the Colab notebook.'],
 };
 
 let currentPanel = 'overview';
@@ -1129,6 +1282,7 @@ async function init() {
   readPalette();
   try {
     await loadData();
+    await loadPredictions();   // optional: the panel explains what to do if it is missing
   } catch (err) {
     document.getElementById('loading-msg').textContent = err.message;
     return;

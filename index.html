@@ -30,6 +30,7 @@
       <li><button class="nav-item" data-panel="events"><span class="nav-dot"></span>Events</button></li>
       <li><button class="nav-item" data-panel="conversion"><span class="nav-dot"></span>Conversion</button></li>
       <li><button class="nav-item" data-panel="ecommerce"><span class="nav-dot"></span>eCommerce</button></li>
+      <li><button class="nav-item" data-panel="predictions"><span class="nav-dot"></span>Predictions</button></li>
     </ul>
 
     <div class="sidebar-footer" id="sidebar-meta">Loading dataset…</div>
@@ -270,6 +271,101 @@
             <p class="card-title">Order value percentiles</p>
             <p class="card-sub">The order value below which 10%, 25%, 50%, 75%, and 90% of orders fall.</p>
             <div class="stat-grid" id="ec-stats-pos"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PREDICTIONS (results exported by GMS_Predictive_Models.ipynb) -->
+      <section class="panel" id="panel-predictions">
+        <div class="card" id="pr-missing" style="display:none;">
+          <p class="card-title">No model results yet</p>
+          <p class="card-sub" style="margin-bottom:0;">
+            Run <strong>GMS_Predictive_Models.ipynb</strong> in Google Colab (Runtime → Run all).
+            It downloads <code>predictions.json</code>. Put that file in this folder, next to
+            <code>data.json</code>, and reload the page.
+          </p>
+        </div>
+
+        <div id="pr-content" style="display:none;">
+          <p class="insight" id="pr-meta" style="margin:0 0 14px;"></p>
+          <div class="kpi-row" id="pr-kpis"></div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <span class="stat-tag">Model vs. baseline</span>
+            <p class="card-title">Every model against its baseline (test set)</p>
+            <p class="card-sub">A model is kept only if it beats its baseline. AUC and recall: higher is better. MAE and distance from 80% coverage: lower is better.</p>
+            <table class="data-table" id="pr-summary"></table>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <span class="stat-tag">#2 Central tendency · #3 Dispersion</span>
+            <p class="card-title">Daily events: Holt-Winters forecast with 80% range</p>
+            <p class="card-sub">Actual events for all 92 days, the forecast for the 14 test days (Jan 18–31) next to the seasonal-naive baseline, and the forecast for the next two weeks (Feb 1–14).</p>
+            <canvas id="pr-forecast" height="110"></canvas>
+          </div>
+
+          <div class="grid cols-2">
+            <div class="card">
+              <span class="stat-tag">#1 Frequency</span>
+              <p class="card-title">Who will buy? Model comparison</p>
+              <p class="card-sub">Visitor-level classification. Recall and AUC are the main metrics; accuracy is shown only to compare with the baseline.</p>
+              <table class="data-table" id="pr-p1-metrics"></table>
+              <p class="insight" id="pr-p1-note"></p>
+            </div>
+            <div class="card">
+              <span class="stat-tag">#1 Frequency</span>
+              <p class="card-title">Top odds ratios (logistic regression)</p>
+              <p class="card-sub">Above 1 raises the odds of buying; below 1 lowers them. Counts are per extra event; categories are compared with the reference category.</p>
+              <table class="data-table" id="pr-p1-odds"></table>
+            </div>
+          </div>
+
+          <div class="grid cols-2">
+            <div class="card">
+              <span class="stat-tag">#2 Central tendency</span>
+              <p class="card-title">Order value and daily traffic accuracy</p>
+              <p class="card-sub">Test-set errors. MAE is the average miss; RMSE weighs large misses more; R² is the share of variation explained.</p>
+              <table class="data-table" id="pr-p2-orders"></table>
+              <div style="height:12px;"></div>
+              <table class="data-table" id="pr-p2-traffic"></table>
+            </div>
+            <div class="card">
+              <span class="stat-tag">#2 Central tendency</span>
+              <p class="card-title">Weekly pattern learned by Holt-Winters</p>
+              <p class="card-sub">Events above or below an average day for each weekday.</p>
+              <canvas id="pr-weekday" height="160"></canvas>
+            </div>
+          </div>
+
+          <div class="grid cols-2">
+            <div class="card">
+              <span class="stat-tag">#3 Dispersion</span>
+              <p class="card-title">How trustworthy are the ranges?</p>
+              <p class="card-sub">Coverage is the share of actual test values inside the predicted range; an 80% range should cover about 80%. Narrower is more useful at similar coverage.</p>
+              <table class="data-table" id="pr-p3"></table>
+            </div>
+            <div class="card">
+              <span class="stat-tag">#4 Position</span>
+              <p class="card-title">High-value orders and quiet days</p>
+              <p class="card-sub">Decision tree vs. logistic regression. Recall is the main metric. Cut-offs come from the training data only.</p>
+              <table class="data-table" id="pr-p4"></table>
+              <p class="insight" id="pr-p4-note"></p>
+            </div>
+          </div>
+
+          <div class="grid cols-2">
+            <div class="card">
+              <span class="stat-tag">#4 Position</span>
+              <p class="card-title">Quiet-day flags for the test period</p>
+              <p class="card-sub">Each test day, whether it was actually quiet, and whether each model flagged it.</p>
+              <table class="data-table" id="pr-p4-flags"></table>
+            </div>
+            <div class="card">
+              <span class="stat-tag">Overfitting</span>
+              <p class="card-title">Training vs. test scores</p>
+              <p class="card-sub">For scores (AUC, F1, coverage) a large positive train − test gap is the warning sign; for errors (RMSE, MAE) a large negative gap is.</p>
+              <table class="data-table" id="pr-overfit"></table>
+            </div>
           </div>
         </div>
       </section>
