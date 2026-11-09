@@ -1509,7 +1509,8 @@ function renderForecasts() {
 
   const wk = P.p2.traffic.weekday_effects || [];
   makeBar('pr-weekday', wk.map((r) => r.weekday.slice(0, 3)), wk.map((r) => Math.round(r.effect_vs_average_day)),
-    { color: wk.map((r) => (r.effect_vs_average_day >= 0 ? PALETTE.chart1 : PALETTE.chart4)), fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v) });
+    { color: wk.map((r) => (r.effect_vs_average_day >= 0 ? PALETTE.chart1 : PALETTE.chart4)), fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v),
+      plugins: [refLinePlugin(0, 'Average day (0)', 'y')] });
 
   renderOdds(P);
   renderTable(document.getElementById('pr-p1-odds'),
