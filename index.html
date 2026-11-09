@@ -60,6 +60,9 @@
         </div>
         <div class="presets" id="presets"></div>
       </div>
+      <p class="fixed-period-note" id="fixed-period-note" hidden>
+        Based on the model's fixed training and test periods, so the date filter doesn't apply here.
+      </p>
     </div>
 
     <div id="panels">
@@ -292,7 +295,6 @@
         </div>
 
         <div class="pr-content" style="display:none;">
-          <p class="insight pr-meta" style="margin:0 0 14px;"></p>
 
           <div class="card" style="margin-bottom:14px;">
             <span class="stat-tag">#2 Central tendency · #3 Dispersion</span>
@@ -313,7 +315,7 @@
             <div class="card">
               <span class="stat-tag">#2 Central tendency</span>
               <p class="card-title">Weekly pattern learned by Holt-Winters</p>
-              <p class="card-sub">Events above or below an average day for each weekday. Weekdays run busy; weekends drop sharply.</p>
+              <p class="card-sub">How many events each weekday gets compared with an average day (the dashed line at 0): + means busier than average, − means quieter. Weekdays run busy; weekends drop sharply.</p>
               <canvas id="pr-weekday" height="160"></canvas>
             </div>
             <div class="card">
@@ -365,7 +367,6 @@
         </div>
 
         <div class="pr-content" style="display:none;">
-          <p class="insight pr-meta" style="margin:0 0 14px;"></p>
           <div class="kpi-row" id="pr-kpis"></div>
 
           <div class="card" style="margin-bottom:14px;">

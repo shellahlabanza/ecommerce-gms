@@ -1497,13 +1497,6 @@ function preparePredictionPanel(panelId) {
   const panel = document.getElementById(panelId);
   panel.querySelector('.pr-missing').style.display = P ? 'none' : '';
   panel.querySelector('.pr-content').style.display = P ? '' : 'none';
-  if (!P) return null;
-
-  const m = P.meta || {};
-  panel.querySelector('.pr-meta').textContent =
-    `Results from ${m.source_csv || 'the notebook'} (generated ${m.generated_at || '—'}). ` +
-    `Time-based split: training ${m.train_days ? m.train_days.join(' → ') : '—'}, ` +
-    `test ${m.test_days ? m.test_days.join(' → ') : '—'}. The date filter above does not apply to this panel.`;
   return P;
 }
 
@@ -1516,7 +1509,8 @@ function renderForecasts() {
 
   const wk = P.p2.traffic.weekday_effects || [];
   makeBar('pr-weekday', wk.map((r) => r.weekday.slice(0, 3)), wk.map((r) => Math.round(r.effect_vs_average_day)),
-    { color: wk.map((r) => (r.effect_vs_average_day >= 0 ? PALETTE.chart1 : PALETTE.chart4)), fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v) });
+    { color: wk.map((r) => (r.effect_vs_average_day >= 0 ? PALETTE.chart1 : PALETTE.chart4)), fmt: (v) => (v > 0 ? '+' : '') + fmtInt(v),
+      plugins: [refLinePlugin(0, 'Average day (0)', 'y')] });
 
   renderOdds(P);
   renderTable(document.getElementById('pr-p1-odds'),
@@ -1679,6 +1673,7 @@ const TITLES = {
 };
 
 let currentPanel = 'overview';
+const FIXED_PERIOD_PANELS = ['forecasts', 'model-accuracy'];
 
 function renderCurrentPanel() {
   const rows = filteredRows();
@@ -1692,6 +1687,10 @@ function switchPanel(panel) {
   const [title, sub] = TITLES[panel];
   document.getElementById('page-title').textContent = title;
   document.getElementById('page-subtitle').textContent = sub;
+  // model pages read predictions.json (fixed train/test split), so the date filter has no effect there
+  const fixedPeriod = FIXED_PERIOD_PANELS.includes(panel);
+  document.querySelector('.daterange').hidden = fixedPeriod;
+  document.getElementById('fixed-period-note').hidden = !fixedPeriod;
   renderCurrentPanel();
 }
 
