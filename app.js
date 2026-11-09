@@ -1634,7 +1634,7 @@ function renderModelAccuracy() {
   const ov = P.overfit_summary || [];
   const scores = ov.filter((r) => ['AUC', 'F1', 'Coverage'].includes(r.metric));
   makeGroupedBar('pr-overfit-chart', scores.map((r) => [`${r.task} (${r.metric})`, r.model]), [
-    { label: 'Training', data: scores.map((r) => r.train), backgroundColor: PALETTE.chart4 },
+    { label: 'Training', data: scores.map((r) => r.train), backgroundColor: PALETTE.muted },
     { label: 'Test', data: scores.map((r) => r.test), backgroundColor: PALETTE.chart1 },
   ], { horizontal: true, min: 0, max: 1, fmt: fmt2 });
   const worst = scores.reduce((a, b) => (b['train − test'] > (a ? a['train − test'] : -Infinity) ? b : a), null);
