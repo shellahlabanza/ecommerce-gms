@@ -1497,13 +1497,6 @@ function preparePredictionPanel(panelId) {
   const panel = document.getElementById(panelId);
   panel.querySelector('.pr-missing').style.display = P ? 'none' : '';
   panel.querySelector('.pr-content').style.display = P ? '' : 'none';
-  if (!P) return null;
-
-  const m = P.meta || {};
-  panel.querySelector('.pr-meta').textContent =
-    `Results from ${m.source_csv || 'the notebook'} (generated ${m.generated_at || '—'}). ` +
-    `Time-based split: training ${m.train_days ? m.train_days.join(' → ') : '—'}, ` +
-    `test ${m.test_days ? m.test_days.join(' → ') : '—'}. The date filter above does not apply to this panel.`;
   return P;
 }
 
@@ -1679,6 +1672,7 @@ const TITLES = {
 };
 
 let currentPanel = 'overview';
+const FIXED_PERIOD_PANELS = ['forecasts', 'model-accuracy'];
 
 function renderCurrentPanel() {
   const rows = filteredRows();
@@ -1692,6 +1686,10 @@ function switchPanel(panel) {
   const [title, sub] = TITLES[panel];
   document.getElementById('page-title').textContent = title;
   document.getElementById('page-subtitle').textContent = sub;
+  // model pages read predictions.json (fixed train/test split), so the date filter has no effect there
+  const fixedPeriod = FIXED_PERIOD_PANELS.includes(panel);
+  document.querySelector('.daterange').hidden = fixedPeriod;
+  document.getElementById('fixed-period-note').hidden = !fixedPeriod;
   renderCurrentPanel();
 }
 
